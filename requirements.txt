@@ -1,3 +1,12 @@
+# Core mesh processing dependencies
 trimesh>=4.0.0
 numpy>=1.24.0
 pynanoinstantmeshes>=0.1.0
+
+# Hunyuan 3D dependencies
+# Note: Install ComfyUI-Hunyuan3d-2-1 first for the underlying libraries
+# https://github.com/visualbruno/ComfyUI-Hunyuan3d-2-1
+torch>=2.0.0
+torchvision>=0.15.0
+PIL>=9.0.0
+spandrel>=0.1.0

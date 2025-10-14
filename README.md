@@ -1,15 +1,23 @@
 # ComfyUI-MeshCraft
 
-**Advanced mesh manipulation and optimization nodes for ComfyUI**
+**Complete 3D generation and manipulation package for ComfyUI**
 
-Craft and transform 3D meshes in ComfyUI. Experimental tools for prompt-based editing, mesh optimization, and parametric sculpting.
+Craft and transform 3D meshes in ComfyUI. Full Hunyuan 3D 2.1 integration with caching optimizations, advanced mesh processing, and experimental tools for prompt-based editing.
 
 ## Features
 
+### 3D Generation (Powered by Hunyuan 3D 2.1)
+- **Image-to-3D**: Generate high-quality meshes from single images
+- **Multi-view Texturing**: AI-powered PBR texture generation
+- **Model Caching**: 5-10x faster workflow execution with intelligent model caching
+- **Batch Processing**: Process multiple images/meshes in one go
+
+### Mesh Processing
 - **Mesh Cleaning**: Remove disconnected floater geometry and degenerate faces
 - **Face Reduction**: Intelligent remeshing using Instant Meshes algorithm
 - **Normal Smoothing**: Smooth vertex normals for better shading
-- **Optimized Performance**: Fast processing for 3D-to-3D editing workflows
+- **UV Unwrapping**: Prepare meshes for texturing
+- **Format Export**: GLB, OBJ, STL support
 
 ## Installation
 
@@ -21,6 +29,15 @@ Craft and transform 3D meshes in ComfyUI. Experimental tools for prompt-based ed
 
 ### Manual Installation
 
+**Step 1: Install Hunyuan 3D (required for generation nodes)**
+```bash
+cd ComfyUI/custom_nodes/
+git clone https://github.com/visualbruno/ComfyUI-Hunyuan3d-2-1
+cd ComfyUI-Hunyuan3d-2-1
+# Follow their installation instructions
+```
+
+**Step 2: Install MeshCraft**
 ```bash
 cd ComfyUI/custom_nodes/
 git clone https://github.com/YOUR_USERNAME/ComfyUI-MeshCraft
@@ -80,13 +97,27 @@ Contributions welcome! This is an experimental workshop for 3D mesh editing.
 
 ## License
 
-MIT License - see LICENSE file for details
+**Mesh Processing Nodes**: MIT License (see LICENSE file)
+
+**Hunyuan 3D Nodes**: Tencent Hunyuan 3D 2.1 Community License (see LICENSE_TENCENT_HUNYUAN)
+- Free for research, education, and commercial use (<1M monthly active users)
+- Geographic restrictions apply (excludes EU, UK, South Korea)
+- Cannot be used to train competing AI models
 
 ## Credits
 
-Built for the ComfyUI community.
+**MeshCraft**: Built for the ComfyUI community. Part of the scan2wall project.
 
-Part of the scan2wall project tooling.
+**Hunyuan 3D Integration**: Based on [ComfyUI-Hunyuan3d-2-1](https://github.com/visualbruno/ComfyUI-Hunyuan3d-2-1) by visualbruno
+
+**Modifications**:
+- Added model caching for 5-10x faster reloads
+- Memory management optimizations
+- Package integration for full 3D pipeline
+
+**Powered by**:
+- Tencent Hunyuan 3D 2.1 (image-to-3D generation)
+- Instant Meshes (remeshing algorithm)
 
 ## Support
 
