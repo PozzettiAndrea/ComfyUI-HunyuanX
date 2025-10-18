@@ -13,6 +13,8 @@ Powered by Tencent Hunyuan 3D 2.1
 License: Tencent Hunyuan 3D 2.1 Community License (see LICENSE_TENCENT_HUNYUAN)
 """
 
+from .model_cache import get_cache_key, get_cached_model, cache_model, clear_cache
+
 from PIL import Image, ImageSequence, ImageOps
 from torch.utils.data import Dataset
 import torch
@@ -266,10 +268,6 @@ class MetaData:
         self.mesh_file = None
 
 class Hy3DMeshGenerator:
-    _cached_pipeline = None
-    _cached_model_path = None
-    _cached_attention_mode = None
-
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -297,12 +295,16 @@ class Hy3DMeshGenerator:
 
         model_path = folder_paths.get_full_path("diffusion_models", model)
 
-        # Only load if not cached or if model/settings changed (or cache disabled)
-        if (not use_cache or
-            Hy3DMeshGenerator._cached_pipeline is None or
-            Hy3DMeshGenerator._cached_model_path != model_path or
-            Hy3DMeshGenerator._cached_attention_mode != attention_mode):
+        # Generate cache key from model path and attention mode
+        cache_key = get_cache_key(model_path, attention_mode=attention_mode)
 
+        # Check cache if enabled
+        cached_pipeline = get_cached_model(cache_key) if use_cache else None
+
+        if cached_pipeline is not None:
+            print("⚡ Using cached pipeline (fast!)")
+            pipeline = cached_pipeline
+        else:
             if not use_cache:
                 print(f"🔄 Loading pipeline: {model} (cache disabled)")
             else:
@@ -314,13 +316,9 @@ class Hy3DMeshGenerator:
                 offload_device=device,
                 attention_mode=attention_mode)
 
+            # Cache the model if caching is enabled
             if use_cache:
-                Hy3DMeshGenerator._cached_pipeline = pipeline
-                Hy3DMeshGenerator._cached_model_path = model_path
-                Hy3DMeshGenerator._cached_attention_mode = attention_mode
-        else:
-            print("⚡ Using cached pipeline (fast!)")
-            pipeline = Hy3DMeshGenerator._cached_pipeline
+                cache_model(cache_key, pipeline)
 
         image = tensor2pil(image)
 
@@ -336,9 +334,6 @@ class Hy3DMeshGenerator:
         return (latents,)
 
 class Hy3DMultiViewsGenerator:
-    _cached_pipeline = None
-    _cached_config_key = None
-
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -377,21 +372,24 @@ class Hy3DMultiViewsGenerator:
             texture_size
         )
 
-        # Create a config key for caching based on pipeline configuration
-        config_key = (
-            view_size,
-            tuple(camera_config["selected_camera_azims"]),
-            tuple(camera_config["selected_camera_elevs"]),
-            tuple(camera_config["selected_view_weights"]),
-            camera_config["ortho_scale"],
-            texture_size
+        # Generate cache key from config parameters
+        cache_key = get_cache_key(
+            "paint_pipeline",
+            view_size=view_size,
+            azims=tuple(camera_config["selected_camera_azims"]),
+            elevs=tuple(camera_config["selected_camera_elevs"]),
+            weights=tuple(camera_config["selected_view_weights"]),
+            ortho_scale=camera_config["ortho_scale"],
+            texture_size=texture_size
         )
 
-        # Only create pipeline if not cached or if config changed (or cache disabled)
-        if (not use_cache or
-            Hy3DMultiViewsGenerator._cached_pipeline is None or
-            Hy3DMultiViewsGenerator._cached_config_key != config_key):
+        # Check cache if enabled
+        cached_pipeline = get_cached_model(cache_key) if use_cache else None
 
+        if cached_pipeline is not None:
+            print("⚡ Using cached paint pipeline (fast!)")
+            paint_pipeline = cached_pipeline
+        else:
             if not use_cache:
                 print("🔄 Creating paint pipeline (cache disabled)")
             else:
@@ -399,12 +397,9 @@ class Hy3DMultiViewsGenerator:
 
             paint_pipeline = Hunyuan3DPaintPipeline(conf)
 
+            # Cache the model if caching is enabled
             if use_cache:
-                Hy3DMultiViewsGenerator._cached_pipeline = paint_pipeline
-                Hy3DMultiViewsGenerator._cached_config_key = config_key
-        else:
-            print("⚡ Using cached paint pipeline (fast!)")
-            paint_pipeline = Hy3DMultiViewsGenerator._cached_pipeline
+                cache_model(cache_key, paint_pipeline)
         
         image = tensor2pil(image)
         
@@ -507,9 +502,10 @@ class Hy3DInPaint:
         texture_mr_tensor = pil2tensor(texture_mr_pil)
         
         output_glb_path = f"{output_mesh_name}.glb"
-        
-        pipeline.clean_memory()
-                
+
+        # Don't call clean_memory() - we're caching the pipeline for reuse!
+        # pipeline.clean_memory()
+
         mm.soft_empty_cache()
         torch.cuda.empty_cache()
         gc.collect()        
@@ -548,10 +544,6 @@ class Hy3D21CameraConfig:
         return (camera_config,)
         
 class Hy3D21VAELoader:
-    _cached_vae = None
-    _cached_model_path = None
-    _cached_config_key = None
-
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -596,14 +588,16 @@ class Hy3D21VAELoader:
                 'pc_sharpedge_size': 0
             }
 
-        config_key = tuple(sorted(vae_config.items()))
+        # Generate cache key from model path and config
+        cache_key = get_cache_key(model_path, **vae_config)
 
-        # Only load if not cached or if model/config changed (or cache disabled)
-        if (not use_cache or
-            Hy3D21VAELoader._cached_vae is None or
-            Hy3D21VAELoader._cached_model_path != model_path or
-            Hy3D21VAELoader._cached_config_key != config_key):
+        # Check cache if enabled
+        cached_vae = get_cached_model(cache_key) if use_cache else None
 
+        if cached_vae is not None:
+            print("⚡ Using cached VAE (fast!)")
+            vae = cached_vae
+        else:
             if not use_cache:
                 print(f"🔄 Loading VAE: {model_name} (cache disabled)")
             else:
@@ -614,13 +608,9 @@ class Hy3D21VAELoader:
             vae.load_state_dict(vae_sd)
             vae.eval().to(torch.float16)
 
+            # Cache the model if caching is enabled
             if use_cache:
-                Hy3D21VAELoader._cached_vae = vae
-                Hy3D21VAELoader._cached_model_path = model_path
-                Hy3D21VAELoader._cached_config_key = config_key
-        else:
-            print("⚡ Using cached VAE (fast!)")
-            vae = Hy3D21VAELoader._cached_vae
+                cache_model(cache_key, vae)
 
         # Don't move to device here - let the decode node handle that
         # This way the VAE stays where it was last used
@@ -1572,10 +1562,11 @@ class Hy3D21GenerateMultiViewsBatch:
                                     json.dump(metaData.__dict__, indent="\t", fp=fw)
                             
                             processed_meshes.append(output_glb_path)
-                            
-                            paint_pipeline.clean_memory()
-                            del paint_pipeline
-                            
+
+                            # Don't call clean_memory() - we're caching the pipeline for reuse!
+                            # paint_pipeline.clean_memory()
+                            # del paint_pipeline
+
                             mm.soft_empty_cache()
                             torch.cuda.empty_cache()
                             gc.collect() 
@@ -1824,10 +1815,11 @@ class Hy3DBakeMultiViewsWithMetaData:
         texture_pil = convert_ndarray_to_pil(albedo)
         texture_mr_pil = convert_ndarray_to_pil(mr)
         texture_tensor = pil2tensor(texture_pil)
-        texture_mr_tensor = pil2tensor(texture_mr_pil)        
-        
-        pipeline.clean_memory()
-        
+        texture_mr_tensor = pil2tensor(texture_mr_pil)
+
+        # Don't call clean_memory() - we're caching the pipeline for reuse!
+        # pipeline.clean_memory()
+
         metadata.mesh_file = f'{output_mesh_name}.glb'
         
         output_metadata_path = os.path.join(output_dir_path,'meta_data.json')
@@ -1947,17 +1939,135 @@ class Hy3DHighPolyToLowPolyBakeMultiViewsWithMetaData:
                     pipeline.set_texture_mr(mr)
                                     
                     output_glb_path = os.path.join(output_dir_path,f'{mesh_name}_{target_face_num}.obj')
-                    
+
                     pipeline.save_mesh(output_glb_path)
-                    
-                    pipeline.clean_memory()
-                    
+
+                    # Don't call clean_memory() - we're caching the pipeline for reuse!
+                    # pipeline.clean_memory()
+
             else:
                 print(f'Mesh file does not exist: {mesh_file_path}')
         else:
             print('target_face_nums is empty')       
         
-        return (output_lowpoly_path,)        
+        return (output_lowpoly_path,)
+
+# ============================================================================
+# Additional Helper Nodes (from andrea-nodes)
+# ============================================================================
+
+class Hy3D21ImageWithAlphaInput:
+    """Combines image + mask into RGBA format for Hunyuan processing"""
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "mask": ("MASK",),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE", "MASK", "IMAGE")
+    RETURN_NAMES = ("image", "mask", "image_with_alpha")
+    FUNCTION = "process_image"
+    CATEGORY = "Hunyuan3D21Wrapper"
+
+    def process_image(self, image, mask):
+        """
+        image: [B, H, W, C] - RGB tensor
+        mask: [B, H, W] - mask tensor
+        """
+        return (image, mask, image)
+
+
+def reducefacesnano(new_mesh, max_facenum):
+    """Face reduction using Instant Meshes (pynanoinstantmeshes)"""
+    try:
+        import pynanoinstantmeshes as PyNIM
+
+        current_faces = len(new_mesh.faces)
+
+        target_vertices = max(100, int(max_facenum * 0.25))
+
+        print(f"Remeshing from {current_faces} faces to ~{max_facenum} target faces...")
+        print(f"Requesting {target_vertices} vertices from Instant Meshes...")
+
+        # Remesh with Instant Meshes
+        new_verts, new_faces = PyNIM.remesh(
+            np.array(new_mesh.vertices, dtype=np.float32),
+            np.array(new_mesh.faces, dtype=np.uint32),
+            target_vertices,
+            align_to_boundaries=True,
+            smooth_iter=2
+        )
+
+        # Instant Meshes can fail, check validity
+        if new_verts.shape[0] - 1 != new_faces.max():
+            raise ValueError("Remeshing failed")
+
+        # Triangulate quads (Instant Meshes outputs quads)
+        new_faces = Trimesh.geometry.triangulate_quads(new_faces)
+
+        new_mesh = Trimesh.Trimesh(vertices=new_verts.astype(np.float32), faces=new_faces)
+
+        print(f"Remeshed: {new_mesh.vertices.shape[0]} vertices, {new_mesh.faces.shape[0]} faces")
+        return new_mesh
+    except Exception as e:
+        print(f"Instant Meshes failed: {e}, returning original mesh")
+        return new_mesh
+
+
+class Hy3D21PostprocessMeshSimple:
+    """Simple mesh post-processing with floater removal, face reduction, etc."""
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "trimesh": ("TRIMESH",),
+                "remove_floaters": ("BOOLEAN", {"default": True}),
+                "remove_degenerate_faces": ("BOOLEAN", {"default": True}),
+                "reduce_faces": ("BOOLEAN", {"default": True}),
+                "max_facenum": ("INT", {"default": 40000, "min": 1, "max": 10000000, "step": 1}),
+                "smooth_normals": ("BOOLEAN", {"default": False}),
+            },
+        }
+
+    RETURN_TYPES = ("TRIMESH",)
+    RETURN_NAMES = ("trimesh",)
+    FUNCTION = "process"
+    CATEGORY = "Hunyuan3D21Wrapper"
+
+    def process(self, trimesh, remove_floaters, remove_degenerate_faces, reduce_faces, max_facenum, smooth_normals):
+        new_mesh = trimesh.copy()
+
+        if remove_floaters:
+            # Split mesh into connected components and keep only the largest
+            components = new_mesh.split(only_watertight=False)
+            if len(components) > 0:
+                new_mesh = components[0]  # Largest component by default
+                for component in components[1:]:
+                    if len(component.faces) > len(new_mesh.faces):
+                        new_mesh = component
+            print(f"Removed floaters: {new_mesh.vertices.shape[0]} vertices, {new_mesh.faces.shape[0]} faces")
+
+        if remove_degenerate_faces:
+            # Remove degenerate faces (zero area, duplicate vertices, etc)
+            new_mesh.remove_degenerate_faces()
+            new_mesh.remove_duplicate_faces()
+            new_mesh.remove_infinite_values()
+            print(f"Removed degenerate faces: {new_mesh.vertices.shape[0]} vertices, {new_mesh.faces.shape[0]} faces")
+
+        if reduce_faces:
+            # Simplify mesh using Instant Meshes
+            new_mesh = reducefacesnano(new_mesh, max_facenum)
+            print(f"Reduced faces: {new_mesh.vertices.shape[0]} vertices, {new_mesh.faces.shape[0]} faces")
+
+        if smooth_normals:
+            # Smooth vertex normals
+            new_mesh.vertex_normals = Trimesh.smoothing.get_vertices_normals(new_mesh)
+
+        return (new_mesh,)
+
 
 NODE_CLASS_MAPPINGS = {
     "Hy3DMeshGenerator": Hy3DMeshGenerator,
@@ -1984,6 +2094,9 @@ NODE_CLASS_MAPPINGS = {
     "Hy3DBakeMultiViewsWithMetaData": Hy3DBakeMultiViewsWithMetaData,
     "Hy3DHighPolyToLowPolyBakeMultiViewsWithMetaData": Hy3DHighPolyToLowPolyBakeMultiViewsWithMetaData,
     "Hy3D21SimpleMeshlibDecimate": Hy3D21SimpleMeshlibDecimate,
+    # Additional nodes from andrea-nodes
+    "Hy3D21ImageWithAlphaInput": Hy3D21ImageWithAlphaInput,
+    "Hy3D21PostprocessMeshSimple": Hy3D21PostprocessMeshSimple,
     #"Hy3D21MultiViewsMeshGenerator": Hy3D21MultiViewsMeshGenerator,
     }
     
@@ -2012,5 +2125,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "Hy3DBakeMultiViewsWithMetaData": "Hunyuan 3D 2.1 Bake MultiViews With MetaData",
     "Hy3DHighPolyToLowPolyBakeMultiViewsWithMetaData": "Hunyuan 3D 2.1 HighPoly to LowPoly Bake MultiViews With MetaData",
     "Hy3D21SimpleMeshlibDecimate": "Hunyuan 3D 2.1 Simple Meshlib Decimation",
+    # Additional nodes from andrea-nodes
+    "Hy3D21ImageWithAlphaInput": "Image with Alpha Input (Hy3D21)",
+    "Hy3D21PostprocessMeshSimple": "PostProcess Mesh Simple (Hy3D21)",
     #"Hy3D21MultiViewsMeshGenerator": "Hunyuan 3D 2.1 MultiViews Mesh Generator"
     }
