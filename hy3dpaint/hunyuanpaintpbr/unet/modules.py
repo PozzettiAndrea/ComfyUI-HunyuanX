@@ -779,7 +779,7 @@ class UNet2p5DConditionModel(torch.nn.Module):
     ) -> None:
         super().__init__()
         self.unet = unet
-        self.unet.enable_model_cpu_offload()
+        # self.unet.enable_model_cpu_offload()  # Disabled: keep models on GPU, no offloading
         self.train_sched = train_sched
         self.val_sched = val_sched
 
@@ -828,7 +828,7 @@ class UNet2p5DConditionModel(torch.nn.Module):
         )
         unet_ckpt = torch.load(unet_ckpt_path, map_location="cpu", weights_only=True)
         unet_2p5d.load_state_dict(unet_ckpt, strict=True)
-        unet_2p5d.enable_model_cpu_offload()
+        # unet_2p5d.enable_model_cpu_offload()  # Disabled: keep models on GPU, no offloading
         unet_2p5d = unet_2p5d.to(torch_dtype)
         return unet_2p5d
 

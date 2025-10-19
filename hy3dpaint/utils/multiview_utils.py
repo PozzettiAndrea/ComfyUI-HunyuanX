@@ -51,7 +51,7 @@ class multiviewDiffusionNet:
         pipeline.set_progress_bar_config(disable=False)
         pipeline.eval()
         setattr(pipeline, "view_size", cfg.model.params.get("view_size", 320))
-        pipeline.enable_model_cpu_offload()
+        # pipeline.enable_model_cpu_offload()  # Disabled: Breaks model caching, keeps models on CPU after inference
         self.pipeline = pipeline.to(self.device)
         self.pipeline.enable_vae_slicing()
         self.pipeline.enable_vae_tiling()

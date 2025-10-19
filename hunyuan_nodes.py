@@ -13,7 +13,7 @@ Powered by Tencent Hunyuan 3D 2.1
 License: Tencent Hunyuan 3D 2.1 Community License (see LICENSE_TENCENT_HUNYUAN)
 """
 
-from .model_cache import get_cache_key, get_cached_model, cache_model, clear_cache
+from .model_cache import get_cache_key, get_cached_model, cache_model, clear_cache, _MODEL_CACHE
 
 from PIL import Image, ImageSequence, ImageOps
 from torch.utils.data import Dataset
@@ -268,61 +268,65 @@ class MetaData:
         self.mesh_file = None
 
 class Hy3DMeshGenerator:
+    def __init__(self):
+        self.pipeline = None
+        self.current_model_path = None
+        self.current_attention_mode = None
+    
     @classmethod
     def INPUT_TYPES(s):
         return {
             "required": {
-                "model": (folder_paths.get_filename_list("diffusion_models"), {"tooltip": "These models are loaded from the 'ComfyUI/models/diffusion_models' -folder"}),
-                "image": ("IMAGE", {"tooltip": "Image to generate mesh from"}),
-                "steps": ("INT", {"default": 50, "min": 1, "max": 100, "step": 1, "tooltip": "Number of diffusion steps"}),
-                "guidance_scale": ("FLOAT", {"default": 5.0, "min": 1, "max": 30, "step": 0.1, "tooltip": "Guidance scale"}),
+                "model": (folder_paths.get_filename_list("diffusion_models"),),
+                "image": ("IMAGE",),
+                "steps": ("INT", {"default": 50, "min": 1, "max": 100}),
+                "guidance_scale": ("FLOAT", {"default": 5.0, "min": 1, "max": 30}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 "attention_mode": (["sdpa", "sageattn"], {"default": "sdpa"}),
-                "use_cache": ("BOOLEAN", {"default": True, "tooltip": "Use cached model (faster) or reload every time (useful for debugging)"}),
+                "use_cache": ("BOOLEAN", {"default": True}),  # ✅ Keep the toggle
             },
         }
 
     RETURN_TYPES = ("HY3DLATENT",)
-    RETURN_NAMES = ("latents",)
     FUNCTION = "loadmodel"
     CATEGORY = "Hunyuan3D21Wrapper"
 
-    def loadmodel(self, model, image, steps, guidance_scale, seed, attention_mode, use_cache=True):
+    def loadmodel(self, model, image, steps, guidance_scale, seed, attention_mode, use_cache):
         device = mm.get_torch_device()
-        offload_device=mm.unet_offload_device()
-
         seed = seed % (2**32)
-
         model_path = folder_paths.get_full_path("diffusion_models", model)
 
-        # Generate cache key from model path and attention mode
-        cache_key = get_cache_key(model_path, attention_mode=attention_mode)
+        # Decide whether to use cache or force reload
+        should_load = (
+            not use_cache or  # ✅ Cache disabled → always reload
+            self.pipeline is None or  # First time
+            self.current_model_path != model_path or  # Model changed
+            self.current_attention_mode != attention_mode  # Settings changed
+        )
 
-        # Check cache if enabled
-        cached_pipeline = get_cached_model(cache_key) if use_cache else None
-
-        if cached_pipeline is not None:
-            print("⚡ Using cached pipeline (fast!)")
-            pipeline = cached_pipeline
-        else:
+        if should_load:
             if not use_cache:
                 print(f"🔄 Loading pipeline: {model} (cache disabled)")
             else:
                 print(f"🔥 Loading pipeline: {model} (first time or settings changed)")
-
-            pipeline = Hunyuan3DDiTFlowMatchingPipeline.from_single_file(
+            
+            self.pipeline = Hunyuan3DDiTFlowMatchingPipeline.from_single_file(
                 config_path=os.path.join(script_directory, 'configs', 'dit_config_2_1.yaml'),
                 ckpt_path=model_path,
-                offload_device=device,
-                attention_mode=attention_mode)
-
-            # Cache the model if caching is enabled
+                attention_mode=attention_mode
+            )
+            
+            # Only update tracking vars if caching is enabled
             if use_cache:
-                cache_model(cache_key, pipeline)
+                self.current_model_path = model_path
+                self.current_attention_mode = attention_mode
+        else:
+            print("⚡ Using cached pipeline (fast!)")
 
+        self.pipeline.to(device)
+        
         image = tensor2pil(image)
-
-        latents = pipeline(
+        latents = self.pipeline(
             image=image,
             num_inference_steps=steps,
             guidance_scale=guidance_scale,
@@ -330,10 +334,13 @@ class Hy3DMeshGenerator:
         )
 
         gc.collect()
-
         return (latents,)
 
 class Hy3DMultiViewsGenerator:
+    def __init__(self):
+        self.paint_pipeline = None
+        self.current_config = None
+
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -358,48 +365,37 @@ class Hy3DMultiViewsGenerator:
 
     def genmultiviews(self, trimesh, camera_config, view_size, image, steps, guidance_scale, texture_size, unwrap_mesh, seed, use_cache=True):
         device = mm.get_torch_device()
-        offload_device=device
-
         seed = seed % (2**32)
 
-        # Create config
-        conf = Hunyuan3DPaintConfig(
-            view_size,
-            camera_config["selected_camera_azims"],
-            camera_config["selected_camera_elevs"],
-            camera_config["selected_view_weights"],
-            camera_config["ortho_scale"],
-            texture_size
+        # Create config hash for comparison
+        config_str = f"{view_size}_{camera_config}_{texture_size}"
+        
+        should_load = (
+            not use_cache or
+            self.paint_pipeline is None or
+            self.current_config != config_str
         )
 
-        # Generate cache key from config parameters
-        cache_key = get_cache_key(
-            "paint_pipeline",
-            view_size=view_size,
-            azims=tuple(camera_config["selected_camera_azims"]),
-            elevs=tuple(camera_config["selected_camera_elevs"]),
-            weights=tuple(camera_config["selected_view_weights"]),
-            ortho_scale=camera_config["ortho_scale"],
-            texture_size=texture_size
-        )
-
-        # Check cache if enabled
-        cached_pipeline = get_cached_model(cache_key) if use_cache else None
-
-        if cached_pipeline is not None:
-            print("⚡ Using cached paint pipeline (fast!)")
-            paint_pipeline = cached_pipeline
-        else:
+        if should_load:
             if not use_cache:
                 print("🔄 Creating paint pipeline (cache disabled)")
             else:
                 print("🔥 Creating paint pipeline (first time or config changed)")
-
-            paint_pipeline = Hunyuan3DPaintPipeline(conf)
-
-            # Cache the model if caching is enabled
+            
+            conf = Hunyuan3DPaintConfig(
+                view_size,
+                camera_config["selected_camera_azims"],
+                camera_config["selected_camera_elevs"],
+                camera_config["selected_view_weights"],
+                camera_config["ortho_scale"],
+                texture_size
+            )
+            self.paint_pipeline = Hunyuan3DPaintPipeline(conf)
+            
             if use_cache:
-                cache_model(cache_key, paint_pipeline)
+                self.current_config = config_str
+        else:
+            print("⚡ Using cached paint pipeline (fast!)")
         
         image = tensor2pil(image)
         
@@ -407,14 +403,14 @@ class Hy3DMultiViewsGenerator:
         os.makedirs(temp_folder_path, exist_ok=True)        
         temp_output_path = os.path.join(temp_folder_path, "textured_mesh.obj")
         
-        albedo, mr, normal_maps, position_maps = paint_pipeline(mesh=trimesh, image_path=image, output_mesh_path=temp_output_path, num_steps=steps, guidance_scale=guidance_scale, unwrap=unwrap_mesh, seed=seed)
+        albedo, mr, normal_maps, position_maps = self.paint_pipeline(mesh=trimesh, image_path=image, output_mesh_path=temp_output_path, num_steps=steps, guidance_scale=guidance_scale, unwrap=unwrap_mesh, seed=seed)
         
         albedo_tensor = hy3dpaintimages_to_tensor(albedo)
         mr_tensor = hy3dpaintimages_to_tensor(mr)
         normals_tensor = hy3dpaintimages_to_tensor(normal_maps)
         positions_tensor = hy3dpaintimages_to_tensor(position_maps)            
         
-        return (paint_pipeline, albedo_tensor, mr_tensor, positions_tensor, normals_tensor, camera_config,)       
+        return (self.paint_pipeline, albedo_tensor, mr_tensor, positions_tensor, normals_tensor, camera_config,)       
         
 class Hy3DBakeMultiViews:
     @classmethod
@@ -544,6 +540,11 @@ class Hy3D21CameraConfig:
         return (camera_config,)
         
 class Hy3D21VAELoader:
+    def __init__(self):
+        self.vae = None
+        self.current_model_path = None
+        self.current_config_hash = None
+    
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -563,8 +564,6 @@ class Hy3D21VAELoader:
 
     def loadmodel(self, model_name, use_cache=True, vae_config=None):
         device = mm.get_torch_device()
-        offload_device=mm.unet_offload_device()
-
         model_path = folder_paths.get_full_path("vae", model_name)
 
         if(vae_config==None):
@@ -588,34 +587,34 @@ class Hy3D21VAELoader:
                 'pc_sharpedge_size': 0
             }
 
-        # Generate cache key from model path and config
-        cache_key = get_cache_key(model_path, **vae_config)
+        # Hash the config
+        config_hash = hashlib.md5(str(sorted(vae_config.items())).encode()).hexdigest()
+        
+        should_load = (
+            not use_cache or
+            self.vae is None or
+            self.current_model_path != model_path or
+            self.current_config_hash != config_hash
+        )
 
-        # Check cache if enabled
-        cached_vae = get_cached_model(cache_key) if use_cache else None
-
-        if cached_vae is not None:
-            print("⚡ Using cached VAE (fast!)")
-            vae = cached_vae
-        else:
+        if should_load:
             if not use_cache:
                 print(f"🔄 Loading VAE: {model_name} (cache disabled)")
             else:
                 print(f"🔥 Loading VAE: {model_name} (first time or settings changed)")
 
             vae_sd = load_torch_file(model_path)
-            vae = ShapeVAE(**vae_config)
-            vae.load_state_dict(vae_sd)
-            vae.eval().to(torch.float16)
-
-            # Cache the model if caching is enabled
+            self.vae = ShapeVAE(**vae_config)
+            self.vae.load_state_dict(vae_sd)
+            self.vae.eval().to(torch.float16)
+            
             if use_cache:
-                cache_model(cache_key, vae)
+                self.current_model_path = model_path
+                self.current_config_hash = config_hash
+        else:
+            print("⚡ Using cached VAE (fast!)")
 
-        # Don't move to device here - let the decode node handle that
-        # This way the VAE stays where it was last used
-
-        return (vae,)  
+        return (self.vae,)
         
 class Hy3D21VAEConfig:
     @classmethod
@@ -1178,415 +1177,7 @@ class Hy3D21SimpleMeshlibDecimate:
             
         new_mesh = postprocessmesh(trimesh.vertices, trimesh.faces, settings)
         
-        return (new_mesh, )          
-
-class Hy3D21MeshGenerationBatch:
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "input_folder": ("STRING",),
-                "output_folder": ("STRING",),
-                "vae_model_name": (folder_paths.get_filename_list("vae"), {"tooltip": "These models are loaded from 'ComfyUI/models/vae'"}),
-                "dit_model_name": (folder_paths.get_filename_list("diffusion_models"), {"tooltip": "These models are loaded from the 'ComfyUI/models/diffusion_models' -folder"}),
-                "steps": ("INT", {"default": 50, "min": 1, "max": 100, "step": 1, "tooltip": "Number of diffusion steps"}),
-                "guidance_scale": ("FLOAT", {"default": 5.0, "min": 1, "max": 30, "step": 0.1, "tooltip": "Guidance scale"}),
-                "attention_mode": (["sdpa", "sageattn"], {"default": "sdpa"}),
-                "box_v": ("FLOAT", {"default": 1.01, "min": -10.0, "max": 10.0, "step": 0.001}),
-                "octree_resolution": ("INT", {"default": 384, "min": 8, "max": 4096, "step": 8}),
-                "num_chunks": ("INT", {"default": 8000, "min": 1, "max": 10000000, "step": 1, "tooltip": "Number of chunks to process at once, higher values use more memory, but make the process faster"}),
-                "mc_level": ("FLOAT", {"default": 0, "min": -1.0, "max": 1.0, "step": 0.0001}),
-                "mc_algo": (["mc", "dmc"], {"default": "mc"}),
-                "simplify": ("BOOLEAN",{"default": True}),
-                "target_face_num": ("INT",{"default": 200000,"min":0,"max":10000000} ),
-                "seed": ("INT",),
-                "generate_random_seed": ("BOOLEAN",{"default":True}),
-                "file_format": (["glb", "obj"],),
-                "remove_background": ("BOOLEAN",{"default":False}),
-                "skip_generated_mesh": ("BOOLEAN", {"default":True}),
-            },
-            "optional": {
-                "enable_flash_vdm": ("BOOLEAN", {"default": True}),
-                "force_offload": ("BOOLEAN", {"default": False, "tooltip": "Offloads the model to the offload device once the process is done."}),
-            }
-        }
-
-    RETURN_TYPES = ("STRING","STRING","STRING","STRING",)
-    RETURN_NAMES = ("input_folder", "output_folder", "processed_input_images", "processed_output_meshes",)
-    FUNCTION = "process"
-    CATEGORY = "Hunyuan3D21Wrapper"
-    DESCRIPTION = "Process all pictures from a folder"
-    OUTPUT_NODE = True
-
-    def process(self, input_folder, output_folder, vae_model_name, dit_model_name, steps, guidance_scale, attention_mode, box_v, octree_resolution, num_chunks, mc_level, mc_algo, simplify, target_face_num, seed, generate_random_seed, file_format, remove_background, skip_generated_mesh, enable_flash_vdm, force_offload):       
-        device = mm.get_torch_device()
-        offload_device=mm.unet_offload_device()
-        
-        files = get_picture_files(input_folder)
-        nb_pictures = len(files)
-        
-        processed_input_images = []
-        processed_output_meshes = []
-        
-        if nb_pictures>0:            
-            rembg = BackgroundRemover()
-            
-            dit_model_path = folder_paths.get_full_path("diffusion_models", dit_model_name)
-            
-            pipeline = Hunyuan3DDiTFlowMatchingPipeline.from_single_file(
-                config_path=os.path.join(script_directory, 'configs', 'dit_config_2_1.yaml'),
-                ckpt_path=dit_model_path,
-                offload_device=offload_device,
-                attention_mode=attention_mode)    
-
-            vae_model_path = folder_paths.get_full_path("vae", vae_model_name)
-            vae_sd = load_torch_file(vae_model_path)
-
-            vae_config = {
-                'num_latents': 4096,
-                'embed_dim': 64,
-                'num_freqs': 8,
-                'include_pi': False,
-                'heads': 16,
-                'width': 1024,
-                'num_encoder_layers': 8,
-                'num_decoder_layers': 16,
-                'qkv_bias': False,
-                'qk_norm': True,
-                'scale_factor': 1.0039506158752403,
-                'geo_decoder_mlp_expand_ratio': 4,
-                'geo_decoder_downsample_ratio': 1,
-                'geo_decoder_ln_post': True,
-                'point_feats': 4,
-                'pc_size': 81920,
-                'pc_sharpedge_size': 0
-            }
-
-            vae = ShapeVAE(**vae_config)
-            vae.load_state_dict(vae_sd)
-            vae.eval().to(torch.float16)
-            vae.to(device)
-            
-            vae.enable_flashvdm_decoder(enabled=enable_flash_vdm, mc_algo=mc_algo)
-            
-            pbar = ProgressBar(nb_pictures)
-            for file in files:           
-                output_file_name = get_filename_without_extension_os_path(file)                
-                output_glb_path = Path(output_folder, f'{output_file_name}.{file_format}')
-                
-                processImage = True
-                
-                if skip_generated_mesh:
-                   if os.path.exists(output_glb_path):
-                       processImage = False
-                
-                if processImage == True:
-                    print(f'Processing {file} ...')
-                    if generate_random_seed:
-                        seed = int.from_bytes(os.urandom(4), 'big')
-                        
-                    image = Image.open(file)
-                    
-                    if remove_background:
-                        print('Removing background ...')
-                        image = rembg(image)
-                    
-                    latents = pipeline(
-                        image=image,
-                        num_inference_steps=steps,
-                        guidance_scale=guidance_scale,
-                        generator=torch.manual_seed(seed)
-                        )
-                    
-                    latents = vae.decode(latents)
-                    outputs = vae.latents2mesh(
-                        latents,
-                        output_type='trimesh',
-                        bounds=box_v,
-                        mc_level=mc_level,
-                        num_chunks=num_chunks,
-                        octree_resolution=octree_resolution,
-                        mc_algo=mc_algo,
-                        enable_pbar=True
-                    )[0]
-                    
-                    if force_offload==True:
-                        vae.to(offload_device)
-                    
-                    outputs.mesh_f = outputs.mesh_f[:, ::-1]                
-                    
-                    mesh_output = Trimesh.Trimesh(outputs.mesh_v, outputs.mesh_f)
-                    mesh_output = FloaterRemover()(mesh_output)
-                    mesh_output = DegenerateFaceRemover()(mesh_output)
-                    
-                    if simplify==True and target_face_num>0:
-                        try:
-                            import meshlib.mrmeshpy as mrmeshpy
-                        except ImportError:
-                            raise ImportError("meshlib not found. Please install it using 'pip install meshlib'")                    
-
-                        if target_face_num == 0 and target_face_ratio == 0.0:
-                            raise ValueError('target_face_num or target_face_ratio must be set')
-
-                        current_faces_num = len(mesh_output.faces)
-                        print(f'Current Faces Number: {current_faces_num}')
-
-                        settings = mrmeshpy.DecimateSettings()
-                        faces_to_delete = current_faces_num - target_face_num
-                        settings.maxDeletedFaces = faces_to_delete                        
-                        settings.packMesh = True
-                        
-                        print('Decimating ...')
-                        mesh_output = postprocessmesh(mesh_output.vertices, mesh_output.faces, settings)                
-                        
-                    output_glb_path.parent.mkdir(exist_ok=True)
-                    
-                    processed_input_images.append(file)
-                    processed_output_meshes.append(output_glb_path)
-                    
-                    mesh_output.export(output_glb_path, file_type=file_format)              
-                                    
-                    mm.soft_empty_cache()
-                    torch.cuda.empty_cache()
-                    gc.collect()     
-                else:
-                    print(f'Skipping file {file}')
-                    
-                pbar.update(1)
-            
-            mm.soft_empty_cache()
-            torch.cuda.empty_cache()
-            gc.collect() 
-            
-        return (input_folder, output_folder, processed_input_images, processed_output_meshes, ) 
-        
-class Hy3D21GenerateMultiViewsBatch:
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "output_folder": ("STRING",),
-                "camera_config": ("HY3D21CAMERA",),
-                "view_size": ("INT", {"default": 512, "min": 512, "max":1024, "step":256}),
-                "steps": ("INT", {"default": 10, "min": 1, "max": 100, "step": 1, "tooltip": "Number of steps"}),
-                "guidance_scale": ("FLOAT", {"default": 3.0, "min": 1, "max": 10, "step": 0.1, "tooltip": "Guidance scale"}),
-                "texture_size": ("INT", {"default":1024,"min":512,"max":4096,"step":512}),
-                "unwrap_mesh": ("BOOLEAN", {"default":True}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 0x7fffffff}),
-                "generate_random_seed": ("BOOLEAN",{"default":True}),
-                "remove_background": ("BOOLEAN",{"default":False}),
-                "skip_generated_mesh": ("BOOLEAN",{"default":True}),
-                "upscale_multiviews": (["None","CustomModel"],{"default":"None"}),
-                "upscale_model_name": (folder_paths.get_filename_list("upscale_models"), ),
-                "export_multiviews": ("BOOLEAN",{"default":True, "tooltip":"Multiviews can be used to apply texture to a low poly mesh"}),
-                "export_metadata": ("BOOLEAN",{"default":True,"tooltip":"Exporta json file with camera config and multiviews"}),
-            },
-            "optional": {
-                "input_images_folder": ("STRING",),
-                "input_meshes_folder": ("STRING",),
-            }
-        }
-
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("processed_meshes",)
-    FUNCTION = "process"
-    CATEGORY = "Hunyuan3D21Wrapper"
-    DESCRIPTION = "Process all meshes from a folder"
-    OUTPUT_NODE = True
-
-    def process(self, output_folder, camera_config, view_size, steps, guidance_scale, texture_size, unwrap_mesh, seed, generate_random_seed, remove_background, skip_generated_mesh, upscale_multiviews, upscale_model_name, export_multiviews, export_metadata, input_images_folder = None, input_meshes_folder = None):       
-        device = mm.get_torch_device()
-        offload_device=mm.unet_offload_device()     
-        rembg = BackgroundRemover()
-        processed_meshes = []
-        
-        vertex_inpaint = True
-        method = "NS"        
-        
-        if input_images_folder != None and input_meshes_folder != None:
-            files = get_picture_files(input_images_folder)
-            nb_pictures = len(files)
-            
-            if nb_pictures>0:                     
-                conf = Hunyuan3DPaintConfig(view_size, camera_config["selected_camera_azims"], camera_config["selected_camera_elevs"], camera_config["selected_view_weights"], camera_config["ortho_scale"], texture_size)                                
-                
-                temp_folder_path = os.path.join(comfy_path, "temp")
-                os.makedirs(temp_folder_path, exist_ok=True)
-                temp_output_path = os.path.join(temp_folder_path, "textured_mesh.obj")
-                
-                pbar = ProgressBar(nb_pictures)
-                for file in files:                    
-                    image_name = get_filename_without_extension_os_path(file)                    
-                    input_meshes = get_mesh_files(input_meshes_folder, image_name)
-                    if len(input_meshes)>0:
-                        if len(input_meshes)>1:
-                            print(f'Warning: Multiple meshes found for input_image {image_name} -> Taking the first one')
-                        
-                        output_file_name = get_filename_without_extension_os_path(file)
-                        output_mesh_folder = os.path.join(output_folder, output_file_name)
-                        output_glb_path = Path(output_mesh_folder, f'{output_file_name}.glb')
-                        
-                        processMesh = True
-                        
-                        if skip_generated_mesh and os.path.exists(output_glb_path):
-                            processMesh = False
-                        
-                        if processMesh:                
-                            os.makedirs(output_mesh_folder, exist_ok=True)
-                            
-                            print(f'Processing {file} with {input_meshes[0]} ...')
-                            metaData = MetaData()
-                            metaData.camera_config = camera_config
-                            image = Image.open(file)
-                            if remove_background:
-                                print('Removing background ...')
-                                image = rembg(image)
-                                
-                            if generate_random_seed:
-                                seed = int.from_bytes(os.urandom(4), 'big')
-                                
-                            trimesh = Trimesh.load(input_meshes[0])      
-                            
-                            paint_pipeline = Hunyuan3DPaintPipeline(conf)
-                            albedo, mr, normal_maps, position_maps = paint_pipeline(mesh=trimesh, image_path=image, output_mesh_path=temp_output_path, num_steps=steps, guidance_scale=guidance_scale, unwrap=unwrap_mesh, seed=seed)
-                            
-                            if export_multiviews:
-                                metaData.albedos = []
-                                metaData.mrs = []
-                                
-                                for index, img in enumerate(albedo):                                
-                                    image_output_path = os.path.join(output_mesh_folder, f'Albedo_{index}.png')
-                                    img.save(image_output_path)
-                                    metaData.albedos.append(f'Albedo_{index}.png')
-                                    
-                                for index, img in enumerate(mr):
-                                    image_output_path = os.path.join(output_mesh_folder, f'MR_{index}.png')
-                                    img.save(image_output_path)                                    
-                                    metaData.mrs.append(f'MR_{index}.png')
-                                                                       
-
-                            if upscale_multiviews == "CustomModel":
-                                model_path = folder_paths.get_full_path_or_raise("upscale_models", upscale_model_name)
-                                sd = comfy.utils.load_torch_file(model_path, safe_load=True)
-                                if "module.layers.0.residual_group.blocks.0.norm1.weight" in sd:
-                                    sd = comfy.utils.state_dict_prefix_replace(sd, {"module.":""})
-                                upscale_model = ModelLoader().load_from_state_dict(sd).eval()
-
-                                if not isinstance(upscale_model, ImageModelDescriptor):
-                                    print("Cannot Upscale: Upscale model must be a single-image model.")
-                                    del upscale_model
-                                    upscale_model = None
-                                else:
-                                    upscale_model.to(device)
-                                
-                                if upscale_model != None:
-                                    print('Upscaling Albedo ...')
-                                    albedo_tensors = hy3dpaintimages_to_tensor(albedo)
-                                    in_img = albedo_tensors.movedim(-1,-3).to(device)
-
-                                    tile = 512
-                                    overlap = 32
-
-                                    oom = True
-                                    while oom:
-                                        try:
-                                            steps = in_img.shape[0] * comfy.utils.get_tiled_scale_steps(in_img.shape[3], in_img.shape[2], tile_x=tile, tile_y=tile, overlap=overlap)
-                                            pbar = comfy.utils.ProgressBar(steps)
-                                            s = comfy.utils.tiled_scale(in_img, lambda a: upscale_model(a), tile_x=tile, tile_y=tile, overlap=overlap, upscale_amount=upscale_model.scale, pbar=pbar)
-                                            oom = False
-                                        except mm.OOM_EXCEPTION as e:
-                                            tile //= 2
-                                            if tile < 128:
-                                                raise e
-
-                                    #upscale_model.to("cpu")
-                                    s = torch.clamp(s.movedim(-3,-1), min=0, max=1.0)
-                                    
-                                    albedo = convert_tensor_images_to_pil(s)
-                                    
-                                    if export_multiviews:
-                                        metaData.albedos_upscaled = []
-                                        for index, img in enumerate(albedo):
-                                            image_output_path = os.path.join(output_mesh_folder, f'Albedo_Upscaled_{index}.png')
-                                            img.save(image_output_path)
-                                            metaData.albedos_upscaled.append(f'Albedo_Upscaled_{index}.png')
-                                    
-                                    print('Upscaling MR ...')
-                                    mr_tensors = hy3dpaintimages_to_tensor(mr)
-                                    in_img = mr_tensors.movedim(-1,-3).to(device)
-
-                                    tile = 512
-                                    overlap = 32
-
-                                    oom = True
-                                    while oom:
-                                        try:
-                                            steps = in_img.shape[0] * comfy.utils.get_tiled_scale_steps(in_img.shape[3], in_img.shape[2], tile_x=tile, tile_y=tile, overlap=overlap)
-                                            pbar = comfy.utils.ProgressBar(steps)
-                                            s = comfy.utils.tiled_scale(in_img, lambda a: upscale_model(a), tile_x=tile, tile_y=tile, overlap=overlap, upscale_amount=upscale_model.scale, pbar=pbar)
-                                            oom = False
-                                        except mm.OOM_EXCEPTION as e:
-                                            tile //= 2
-                                            if tile < 128:
-                                                raise e
-
-                                    #upscale_model.to("cpu")
-                                    s = torch.clamp(s.movedim(-3,-1), min=0, max=1.0)
-                                    
-                                    mr = convert_tensor_images_to_pil(s) 
-
-                                    if export_multiviews:
-                                        metaData.mrs_upscaled = []
-                                        for index, img in enumerate(mr):
-                                            image_output_path = os.path.join(output_mesh_folder, f'MR_Upscaled_{index}.png')
-                                            img.save(image_output_path)
-                                            metaData.mrs_upscaled.append(f'MR_Upscaled_{index}.png')
-                                    
-                                    del upscale_model
-                            
-                            print('Baking MultiViews ...')
-                            texture, mask, texture_mr, mask_mr = paint_pipeline.bake_from_multiview(albedo,mr,camera_config["selected_camera_elevs"], camera_config["selected_camera_azims"], camera_config["selected_view_weights"])
-                            
-                            albedo, mr = paint_pipeline.inpaint(texture, mask, texture_mr, mask_mr, vertex_inpaint, method)        
-                            paint_pipeline.set_texture_albedo(albedo)
-                            paint_pipeline.set_texture_mr(mr)
-                            
-                            output_mesh_path = os.path.join(comfy_path, "temp", f"{output_file_name}.obj")
-                            output_temp_path = paint_pipeline.save_mesh(output_mesh_path)                   
-                            shutil.copyfile(output_temp_path, output_glb_path)
-                            metaData.mesh_file = f'{output_file_name}.glb'
-                            
-                            if export_metadata:
-                                output_metadata_path = os.path.join(output_mesh_folder,'meta_data.json')
-                                with open(output_metadata_path,'w') as fw:
-                                    json.dump(metaData.__dict__, indent="\t", fp=fw)
-                            
-                            processed_meshes.append(output_glb_path)
-
-                            # Don't call clean_memory() - we're caching the pipeline for reuse!
-                            # paint_pipeline.clean_memory()
-                            # del paint_pipeline
-
-                            mm.soft_empty_cache()
-                            torch.cuda.empty_cache()
-                            gc.collect() 
-                        else:
-                            print(f'Skipping {file}') 
-                    else:
-                        print(f'Error: No mesh found for input image {image_name}')
-                        
-                    pbar.update(1)
-                
-            else:
-                print('No image found in input_images_folder')
-        else:
-            print('Nothing to process')       
-        
-        mm.soft_empty_cache()
-        torch.cuda.empty_cache()
-        gc.collect() 
-            
-        return (processed_meshes, )    
+        return (new_mesh, )  
 
 class Hy3D21UseMultiViews:
     @classmethod
@@ -2086,8 +1677,6 @@ NODE_CLASS_MAPPINGS = {
     "Hy3D21LoadMesh": Hy3D21LoadMesh,
     "Hy3D21IMRemesh": Hy3D21IMRemesh,
     "Hy3D21MeshlibDecimate": Hy3D21MeshlibDecimate,
-    "Hy3D21MeshGenerationBatch": Hy3D21MeshGenerationBatch,
-    "Hy3D21GenerateMultiViewsBatch": Hy3D21GenerateMultiViewsBatch,
     "Hy3D21UseMultiViews": Hy3D21UseMultiViews,
     "Hy3D21UseMultiViewsFromMetaData": Hy3D21UseMultiViewsFromMetaData,
     "Hy3D21MultiViewsGeneratorWithMetaData": Hy3D21MultiViewsGeneratorWithMetaData,
@@ -2117,8 +1706,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "Hy3D21LoadMesh": "Hunyuan 3D 2.1 Load Mesh",
     "Hy3D21IMRemesh": "Hunyuan 3D 2.1 Instant-Meshes Remesh",
     "Hy3D21MeshlibDecimate": "Hunyuan 3D 2.1 Meshlib Decimation",
-    "Hy3D21MeshGenerationBatch": "Hunyuan 3D 2.1 Mesh Generator from Folder",
-    "Hy3D21GenerateMultiViewsBatch": "Hunyuan 3D 2.1 MultiViews Generator Batch",
     "Hy3D21UseMultiViews": "Hunyuan 3D 2.1 Use MultiViews",
     "Hy3D21UseMultiViewsFromMetaData": "Hunyuan 3D 2.1 Use MultiViews From MetaData",
     "Hy3D21MultiViewsGeneratorWithMetaData": "Hunyuan 3D 2.1 MultiViews Generator With MetaData",

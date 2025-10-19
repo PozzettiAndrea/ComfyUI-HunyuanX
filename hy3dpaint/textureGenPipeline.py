@@ -113,31 +113,34 @@ class Hunyuan3DPaintPipeline:
 
     def _get_or_load_model(self):
         """Get cached model or load if not cached"""
-        device = mm.get_torch_device()  # Add this
-        
+        device = mm.get_torch_device()
+
         # Create a config key for caching (use relevant config parameters)
         config_key = (
             self.config.resolution,
             self.config.texture_size,
             # Add other config params that affect model loading
         )
-        
+
         # Check if we need to load/reload the model
         if (Hunyuan3DPaintPipeline._cached_multiview_model is None or
             Hunyuan3DPaintPipeline._cached_model_config != config_key):
-            
+
             print("🔥 Loading multiview diffusion model (first time or config changed)")
             Hunyuan3DPaintPipeline._cached_multiview_model = multiviewDiffusionNet(self.config)
             Hunyuan3DPaintPipeline._cached_model_config = config_key
+            print(f"✓ Model loaded on device: {device}")
         else:
             print("⚡ Using cached multiview model")
-        
-        # CRITICAL: Ensure model is on the correct device
+            print(f"🔧 Ensuring model is on device: {device}")
+
+        # CRITICAL: Ensure model pipeline is on the correct device
         model = Hunyuan3DPaintPipeline._cached_multiview_model
-        # Move the pipeline components to the correct device
         if hasattr(model, 'pipeline'):
+            # Move the entire pipeline (including VAE, UNet, etc) to device
             model.pipeline.to(device)
-        
+            print(f"✓ Pipeline moved to {device}")
+
         return model
 
     @torch.no_grad()
@@ -209,6 +212,10 @@ class Hunyuan3DPaintPipeline:
 
         ###########  Multiview  ##########
         print('Generating MultiViews PBR ...')
+
+        # Note: normal_maps and position_maps are PIL Images at this point
+        # They will be resized and converted to tensors inside self.model()
+        # The device placement happens automatically in the multiview pipeline
         multiviews_pbr = self.model(
             image_prompt,
             normal_maps + position_maps,

@@ -154,27 +154,6 @@ class Hunyuan3DDiTPipeline:
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
 
-        # # load ckpt
-        # if use_safetensors:
-        #     ckpt_path = ckpt_path.replace('.ckpt', '.safetensors')
-        # if not os.path.exists(ckpt_path):
-        #     raise FileNotFoundError(f"Model file {ckpt_path} not found")
-        # logger.info(f"Loading model from {ckpt_path}")
-
-        # if use_safetensors:
-        #     # parse safetensors
-        #     import safetensors.torch
-        #     safetensors_ckpt = safetensors.torch.load_file(ckpt_path, device='cpu')
-        #     ckpt = {}
-        #     for key, value in safetensors_ckpt.items():
-        #         model_name = key.split('.')[0]
-        #         new_key = key[len(model_name) + 1:]
-        #         if model_name not in ckpt:
-        #             ckpt[model_name] = {}
-        #         ckpt[model_name][new_key] = value
-        # else:
-        #     ckpt = torch.load(ckpt_path, map_location='cpu', weights_only=True)
-
         config['model']['params']['attention_mode'] = attention_mode
         ckpt = load_torch_file(ckpt_path)
         # load model
@@ -429,7 +408,7 @@ class Hunyuan3DDiTPipeline:
             hook.remove()
 
         # make sure the model is in the same state as before calling it
-        self.enable_model_cpu_offload()
+        # self.enable_model_cpu_offload()  # Disabled: Breaks model caching by moving to CPU after inference
 
     @synchronize_timer('Encode cond')
     def encode_cond(self, image, additional_cond_inputs, do_classifier_free_guidance, dual_guidance):
