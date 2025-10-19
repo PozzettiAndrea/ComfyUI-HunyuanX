@@ -879,6 +879,7 @@ class Hy3D21PostprocessMesh:
                 "reduce_faces": ("BOOLEAN", {"default": True}),
                 "max_facenum": ("INT", {"default": 40000, "min": 1, "max": 10000000, "step": 1}),
                 "smooth_normals": ("BOOLEAN", {"default": False}),
+                "smooth_surface": ("BOOLEAN", {"default": False}),
             },
         }
 
@@ -887,7 +888,7 @@ class Hy3D21PostprocessMesh:
     FUNCTION = "process"
     CATEGORY = "Hunyuan3D21Wrapper"
 
-    def process(self, trimesh, remove_floaters, remove_degenerate_faces, reduce_faces, max_facenum, smooth_normals):
+    def process(self, trimesh, remove_floaters, remove_degenerate_faces, reduce_faces, max_facenum, smooth_normals, smooth_surface):
         new_mesh = trimesh.copy()
         if remove_floaters:
             new_mesh = FloaterRemover()(new_mesh)
@@ -900,7 +901,8 @@ class Hy3D21PostprocessMesh:
             print(f"Reduced faces, resulting in {new_mesh.vertices.shape[0]} vertices and {new_mesh.faces.shape[0]} faces")
         if smooth_normals:              
             new_mesh.vertex_normals = Trimesh.smoothing.get_vertices_normals(new_mesh)
-        
+        if smooth_surface:
+            new_mesh = Trimesh.smoothing.filter_laplacian(new_mesh, iterations=3)
         return (new_mesh, )
         
 class Hy3D21ExportMesh:
