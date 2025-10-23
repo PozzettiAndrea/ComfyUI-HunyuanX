@@ -51,7 +51,7 @@
       "guidance_scale": 3,
       "texture_size": 1024,
       "unwrap_mesh": false,
-      "seed": 37730259803632,
+      "seed": 1014674437902746,
       "use_cache": true,
       "trimesh": [
         "45",
@@ -62,8 +62,8 @@
         0
       ],
       "image": [
-        "268",
-        0
+        "296",
+        2
       ]
     },
     "class_type": "Hy3DMultiViewsGenerator",
@@ -100,12 +100,12 @@
       "model": "hunyuan3d-dit-v2-1-fp16.ckpt",
       "steps": 50,
       "guidance_scale": 8.5,
-      "seed": 959340415880934,
+      "seed": 165204556603755,
       "attention_mode": "sageattn",
       "use_cache": true,
       "image": [
-        "268",
-        0
+        "296",
+        2
       ]
     },
     "class_type": "Hy3DMeshGenerator",
@@ -230,7 +230,7 @@
   },
   "112": {
     "inputs": {
-      "image": "567744545_987266420252108_6459597905086070799_n.jpg"
+      "image": "unnamed (2).jpg"
     },
     "class_type": "LoadImage",
     "_meta": {
@@ -261,12 +261,28 @@
       "multiplier": 1,
       "start_color": "#FFFFFF",
       "end_color": "#FFFFFF",
-      "width": 520,
-      "height": 520
+      "width": 1024,
+      "height": 1024
     },
     "class_type": "ImageGradient",
     "_meta": {
       "title": "Image Gradient"
+    }
+  },
+  "116": {
+    "inputs": {
+      "filename_prefix": [
+        "174",
+        0
+      ],
+      "images": [
+        "142",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
     }
   },
   "117": {
@@ -343,6 +359,53 @@
     "class_type": "Hy3D21ExportMesh",
     "_meta": {
       "title": "Hunyuan 3D 2.1 Export Mesh"
+    }
+  },
+  "136": {
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "upscale_method": "lanczos",
+      "keep_proportion": "pad",
+      "pad_color": "0, 0, 0",
+      "crop_position": "center",
+      "divisible_by": 2,
+      "device": "cpu",
+      "image": [
+        "117",
+        0
+      ],
+      "mask": [
+        "117",
+        1
+      ]
+    },
+    "class_type": "ImageResizeKJv2",
+    "_meta": {
+      "title": "Resize Image v2"
+    }
+  },
+  "142": {
+    "inputs": {
+      "x": 1,
+      "y": 0,
+      "resize_source": false,
+      "destination": [
+        "115",
+        0
+      ],
+      "source": [
+        "136",
+        0
+      ],
+      "mask": [
+        "136",
+        3
+      ]
+    },
+    "class_type": "ImageCompositeMasked",
+    "_meta": {
+      "title": "ImageCompositeMasked"
     }
   },
   "152": {
@@ -493,7 +556,7 @@
   },
   "179": {
     "inputs": {
-      "model": "MM-GroundingDINO: Large O365v2+OIv6+GoldG (53.0 mAP)",
+      "model": "Florence-2: Large (0.77B params)",
       "keep_in_memory": true,
       "florence2_attn": "eager"
     },
@@ -526,7 +589,7 @@
   },
   "182": {
     "inputs": {
-      "model": "sam2_hiera_base_plus.safetensors",
+      "model": "sam2_hiera_large.safetensors",
       "segmentor": "single_image",
       "device": "cuda",
       "precision": "fp16"
@@ -568,19 +631,49 @@
       "title": "MaskComposite"
     }
   },
-  "237": {
+  "238": {
     "inputs": {
-      "vae_name": "ae.safetensors"
+      "filename_prefix": [
+        "239",
+        0
+      ],
+      "images": [
+        "178",
+        1
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "239": {
+    "inputs": {
+      "string_a": [
+        "89",
+        0
+      ],
+      "string_b": "_annotated",
+      "delimiter": ""
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "Concatenate"
+    }
+  },
+  "278": {
+    "inputs": {
+      "vae_name": "lumina_ae.safetensors"
     },
     "class_type": "VAELoader",
     "_meta": {
       "title": "Load VAE"
     }
   },
-  "238": {
+  "279": {
     "inputs": {
       "conditioning": [
-        "262",
+        "290",
         0
       ]
     },
@@ -589,14 +682,14 @@
       "title": "ConditioningZeroOut"
     }
   },
-  "239": {
+  "280": {
     "inputs": {
       "conditioning": [
-        "262",
+        "290",
         0
       ],
       "latent": [
-        "259",
+        "289",
         0
       ]
     },
@@ -605,7 +698,7 @@
       "title": "ReferenceLatent"
     }
   },
-  "241": {
+  "281": {
     "inputs": {
       "clip_name1": "clip_l.safetensors",
       "clip_name2": "t5xxl_fp8_e4m3fn_scaled.safetensors",
@@ -617,7 +710,7 @@
       "title": "DualCLIPLoader"
     }
   },
-  "242": {
+  "282": {
     "inputs": {
       "unet_name": "flux1-dev-kontext_fp8_scaled.safetensors",
       "weight_dtype": "default"
@@ -627,28 +720,28 @@
       "title": "Load Diffusion Model"
     }
   },
-  "243": {
+  "283": {
     "inputs": {
-      "seed": 862386227545524,
+      "seed": 487219886986542,
       "steps": 25,
       "cfg": 1,
       "sampler_name": "euler",
       "scheduler": "simple",
       "denoise": 1,
       "model": [
-        "242",
+        "282",
         0
       ],
       "positive": [
-        "248",
+        "285",
         0
       ],
       "negative": [
-        "238",
+        "279",
         0
       ],
       "latent_image": [
-        "259",
+        "289",
         0
       ]
     },
@@ -657,25 +750,11 @@
       "title": "KSampler"
     }
   },
-  "244": {
-    "inputs": {
-      "light_position": "Left Light",
-      "multiplier": 1,
-      "start_color": "#FFFFFF",
-      "end_color": "#FFFFFF",
-      "width": 1032,
-      "height": 1024
-    },
-    "class_type": "ImageGradient",
-    "_meta": {
-      "title": "Image Gradient"
-    }
-  },
-  "248": {
+  "285": {
     "inputs": {
       "guidance": 2.5,
       "conditioning": [
-        "239",
+        "280",
         0
       ]
     },
@@ -684,14 +763,14 @@
       "title": "FluxGuidance"
     }
   },
-  "249": {
+  "286": {
     "inputs": {
       "samples": [
-        "243",
+        "283",
         0
       ],
       "vae": [
-        "237",
+        "278",
         0
       ]
     },
@@ -700,57 +779,14 @@
       "title": "VAE Decode"
     }
   },
-  "256": {
-    "inputs": {
-      "width": 1024,
-      "height": 1024,
-      "upscale_method": "nearest-exact",
-      "keep_proportion": "pad",
-      "pad_color": "0, 0, 0",
-      "crop_position": "center",
-      "divisible_by": 2,
-      "device": "cpu",
-      "image": [
-        "257",
-        0
-      ]
-    },
-    "class_type": "ImageResizeKJv2",
-    "_meta": {
-      "title": "Resize Image v2"
-    }
-  },
-  "257": {
-    "inputs": {
-      "x": 0,
-      "y": 0,
-      "resize_source": false,
-      "destination": [
-        "244",
-        0
-      ],
-      "source": [
-        "117",
-        0
-      ],
-      "mask": [
-        "117",
-        1
-      ]
-    },
-    "class_type": "ImageCompositeMasked",
-    "_meta": {
-      "title": "ImageCompositeMasked"
-    }
-  },
-  "259": {
+  "289": {
     "inputs": {
       "pixels": [
-        "256",
+        "142",
         0
       ],
       "vae": [
-        "237",
+        "278",
         0
       ]
     },
@@ -759,11 +795,11 @@
       "title": "VAE Encode"
     }
   },
-  "262": {
+  "290": {
     "inputs": {
       "text": "transform into a premium studio photograph of a high quality 3D asset\n\nKeep position and pose the same",
       "clip": [
-        "241",
+        "281",
         0
       ]
     },
@@ -772,11 +808,11 @@
       "title": "CLIP Text Encode (Positive Prompt)"
     }
   },
-  "264": {
+  "291": {
     "inputs": {
       "torchscript_jit": "default",
       "image": [
-        "249",
+        "286",
         0
       ]
     },
@@ -785,15 +821,18 @@
       "title": "Inspyrenet Rembg"
     }
   },
-  "266": {
+  "292": {
     "inputs": {
-      "filename_prefix": "ComfyUI",
+      "filename_prefix": [
+        "295",
+        0
+      ],
       "images": [
-        "264",
+        "291",
         0
       ],
       "mask": [
-        "264",
+        "291",
         1
       ]
     },
@@ -802,37 +841,34 @@
       "title": "Save Image With Alpha"
     }
   },
-  "267": {
+  "295": {
     "inputs": {
-      "filename_prefix": "ComfyUI",
-      "images": [
-        "117",
+      "string_a": [
+        "89",
         0
       ],
-      "mask": [
-        "117",
-        1
-      ]
+      "string_b": "_upscaled",
+      "delimiter": ""
     },
-    "class_type": "SaveImageWithAlpha",
+    "class_type": "StringConcatenate",
     "_meta": {
-      "title": "Save Image With Alpha"
+      "title": "Concatenate"
     }
   },
-  "268": {
+  "296": {
     "inputs": {
       "image": [
-        "264",
+        "291",
         0
       ],
-      "alpha": [
-        "264",
+      "mask": [
+        "291",
         1
       ]
     },
-    "class_type": "JoinImageWithAlpha",
+    "class_type": "Hy3D21ImageWithAlphaInput",
     "_meta": {
-      "title": "Join Image with Alpha"
+      "title": "Image with Alpha Input (Hy3D21)"
     }
   }
 }
