@@ -17,3 +17,5 @@ scikit-image
 pybind11
 timm
 meshlib
+rembg
+onnxruntime

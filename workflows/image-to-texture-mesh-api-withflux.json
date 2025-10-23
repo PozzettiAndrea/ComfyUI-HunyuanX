@@ -1,0 +1,838 @@
+{
+  "4": {
+    "inputs": {
+      "model_name": "Hunyuan3D-vae-v2-1-fp16.ckpt",
+      "use_cache": true
+    },
+    "class_type": "Hy3D21VAELoader",
+    "_meta": {
+      "title": "Hunyuan 3D 2.1 VAE Loader"
+    }
+  },
+  "9": {
+    "inputs": {
+      "box_v": 1.01,
+      "octree_resolution": 256,
+      "num_chunks": 64000,
+      "mc_level": 0.002,
+      "mc_algo": "dmc",
+      "enable_flash_vdm": true,
+      "force_offload": false,
+      "vae": [
+        "4",
+        0
+      ],
+      "latents": [
+        "37",
+        0
+      ]
+    },
+    "class_type": "Hy3D21VAEDecode",
+    "_meta": {
+      "title": "Hunyuan 3D 2.1 VAE Decoder"
+    }
+  },
+  "19": {
+    "inputs": {
+      "camera_azimuths": "0, 90, 180, 270, 0, 180",
+      "camera_elevations": "0, 0, 0, 0, 90, -90",
+      "view_weights": "1, 0.5, 1, 0.5, 1, 1",
+      "ortho_scale": 1.1
+    },
+    "class_type": "Hy3D21CameraConfig",
+    "_meta": {
+      "title": "Hunyuan 3D 2.1 Camera Config"
+    }
+  },
+  "20": {
+    "inputs": {
+      "view_size": 768,
+      "steps": 6,
+      "guidance_scale": 3,
+      "texture_size": 1024,
+      "unwrap_mesh": false,
+      "seed": 37730259803632,
+      "use_cache": true,
+      "trimesh": [
+        "45",
+        0
+      ],
+      "camera_config": [
+        "19",
+        0
+      ],
+      "image": [
+        "268",
+        0
+      ]
+    },
+    "class_type": "Hy3DMultiViewsGenerator",
+    "_meta": {
+      "title": "Hunyuan 3D 2.1 MultiViews Generator"
+    }
+  },
+  "21": {
+    "inputs": {
+      "pipeline": [
+        "20",
+        0
+      ],
+      "camera_config": [
+        "19",
+        0
+      ],
+      "albedo": [
+        "20",
+        1
+      ],
+      "mr": [
+        "20",
+        2
+      ]
+    },
+    "class_type": "Hy3DBakeMultiViews",
+    "_meta": {
+      "title": "Hunyuan 3D 2.1 Bake MultiViews"
+    }
+  },
+  "37": {
+    "inputs": {
+      "model": "hunyuan3d-dit-v2-1-fp16.ckpt",
+      "steps": 50,
+      "guidance_scale": 8.5,
+      "seed": 959340415880934,
+      "attention_mode": "sageattn",
+      "use_cache": true,
+      "image": [
+        "268",
+        0
+      ]
+    },
+    "class_type": "Hy3DMeshGenerator",
+    "_meta": {
+      "title": "Hunyuan 3D 2.1 Mesh Generator"
+    }
+  },
+  "45": {
+    "inputs": {
+      "trimesh": [
+        "165",
+        0
+      ]
+    },
+    "class_type": "Hy3D21MeshUVWrap",
+    "_meta": {
+      "title": "Hunyuan 3D 2.1 Mesh UV Wrap"
+    }
+  },
+  "46": {
+    "inputs": {
+      "filename_prefix": [
+        "177",
+        0
+      ],
+      "images": [
+        "20",
+        1
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "49": {
+    "inputs": {
+      "output_mesh_name": [
+        "89",
+        0
+      ],
+      "pipeline": [
+        "21",
+        0
+      ],
+      "albedo": [
+        "21",
+        1
+      ],
+      "albedo_mask": [
+        "21",
+        2
+      ],
+      "mr": [
+        "21",
+        3
+      ],
+      "mr_mask": [
+        "21",
+        4
+      ]
+    },
+    "class_type": "Hy3DInPaint",
+    "_meta": {
+      "title": "Hunyuan 3D 2.1 InPaint"
+    }
+  },
+  "50": {
+    "inputs": {
+      "images": [
+        "49",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "51": {
+    "inputs": {
+      "images": [
+        "49",
+        1
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "88": {
+    "inputs": {
+      "value": 25000
+    },
+    "class_type": "INTConstant",
+    "_meta": {
+      "title": "INT Constant"
+    }
+  },
+  "89": {
+    "inputs": {
+      "string": "whatever"
+    },
+    "class_type": "StringConstant",
+    "_meta": {
+      "title": "String Constant"
+    }
+  },
+  "104": {
+    "inputs": {
+      "model_file": [
+        "49",
+        3
+      ],
+      "image": ""
+    },
+    "class_type": "Preview3D",
+    "_meta": {
+      "title": "Preview 3D"
+    }
+  },
+  "112": {
+    "inputs": {
+      "image": "567744545_987266420252108_6459597905086070799_n.jpg"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "113": {
+    "inputs": {
+      "filename_prefix": [
+        "175",
+        0
+      ],
+      "file_format": "stl",
+      "save_file": true,
+      "trimesh": [
+        "9",
+        0
+      ]
+    },
+    "class_type": "Hy3D21ExportMesh",
+    "_meta": {
+      "title": "Hunyuan 3D 2.1 Export Mesh"
+    }
+  },
+  "115": {
+    "inputs": {
+      "light_position": "Top Light",
+      "multiplier": 1,
+      "start_color": "#FFFFFF",
+      "end_color": "#FFFFFF",
+      "width": 520,
+      "height": 520
+    },
+    "class_type": "ImageGradient",
+    "_meta": {
+      "title": "Image Gradient"
+    }
+  },
+  "117": {
+    "inputs": {
+      "invert_mask": false,
+      "detect": "mask_area",
+      "top_reserve": 20,
+      "bottom_reserve": 20,
+      "left_reserve": 20,
+      "right_reserve": 20,
+      "round_to_multiple": "8",
+      "image": [
+        "112",
+        0
+      ],
+      "mask": [
+        "210",
+        0
+      ]
+    },
+    "class_type": "LayerUtility: CropByMask V2",
+    "_meta": {
+      "title": "LayerUtility: CropByMask V2"
+    }
+  },
+  "119": {
+    "inputs": {
+      "model_file": [
+        "113",
+        0
+      ],
+      "image": ""
+    },
+    "class_type": "Preview3D",
+    "_meta": {
+      "title": "Preview 3D"
+    }
+  },
+  "128": {
+    "inputs": {
+      "model_name": "SwinIR-Helaman-Lexica-2x.pth"
+    },
+    "class_type": "UpscaleModelLoader",
+    "_meta": {
+      "title": "Load Upscale Model"
+    }
+  },
+  "129": {
+    "inputs": {
+      "model_file": [
+        "130",
+        0
+      ],
+      "image": ""
+    },
+    "class_type": "Preview3D",
+    "_meta": {
+      "title": "Preview 3D"
+    }
+  },
+  "130": {
+    "inputs": {
+      "filename_prefix": [
+        "176",
+        0
+      ],
+      "file_format": "stl",
+      "save_file": true,
+      "trimesh": [
+        "45",
+        0
+      ]
+    },
+    "class_type": "Hy3D21ExportMesh",
+    "_meta": {
+      "title": "Hunyuan 3D 2.1 Export Mesh"
+    }
+  },
+  "152": {
+    "inputs": {
+      "model_name": "GroundingDINO_SwinB (938MB)"
+    },
+    "class_type": "GroundingDinoModelLoader (segment anything2)",
+    "_meta": {
+      "title": "GroundingDinoModelLoader (segment anything2)"
+    }
+  },
+  "154": {
+    "inputs": {
+      "model_name": "sam2_hiera_large.pt"
+    },
+    "class_type": "SAM2ModelLoader (segment anything2)",
+    "_meta": {
+      "title": "SAM2ModelLoader (segment anything2)"
+    }
+  },
+  "155": {
+    "inputs": {
+      "output": "",
+      "source": [
+        "158",
+        0
+      ]
+    },
+    "class_type": "Display Any (rgthree)",
+    "_meta": {
+      "title": "Display Any (rgthree)"
+    }
+  },
+  "158": {
+    "inputs": {
+      "text": "text",
+      "delimiter": "sitting"
+    },
+    "class_type": "CR Split String",
+    "_meta": {
+      "title": "🔤 CR Split String"
+    }
+  },
+  "160": {
+    "inputs": {
+      "model_name": "4x-UltraSharpV2.safetensors"
+    },
+    "class_type": "UpscaleModelLoader",
+    "_meta": {
+      "title": "Load Upscale Model"
+    }
+  },
+  "165": {
+    "inputs": {
+      "remove_floaters": true,
+      "remove_degenerate_faces": true,
+      "reduce_faces": true,
+      "max_facenum": 100000,
+      "smooth_normals": true,
+      "smooth_surface": true,
+      "trimesh": [
+        "9",
+        0
+      ]
+    },
+    "class_type": "Hy3D21PostprocessMesh",
+    "_meta": {
+      "title": "Hunyuan 3D 2.1 Post Process Trimesh"
+    }
+  },
+  "174": {
+    "inputs": {
+      "string_a": [
+        "89",
+        0
+      ],
+      "string_b": "_nobackground",
+      "delimiter": ""
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "Concatenate"
+    }
+  },
+  "175": {
+    "inputs": {
+      "string_a": [
+        "89",
+        0
+      ],
+      "string_b": "_decoded",
+      "delimiter": ""
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "Concatenate"
+    }
+  },
+  "176": {
+    "inputs": {
+      "string_a": [
+        "89",
+        0
+      ],
+      "string_b": "_processed",
+      "delimiter": ""
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "Concatenate"
+    }
+  },
+  "177": {
+    "inputs": {
+      "string_a": [
+        "89",
+        0
+      ],
+      "string_b": "_multiview",
+      "delimiter": ""
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "Concatenate"
+    }
+  },
+  "178": {
+    "inputs": {
+      "prompt": "main object in the center, main object in the foreground",
+      "confidence_threshold": 0.3,
+      "text_threshold": 0.25,
+      "single_box_mode": true,
+      "bbox_output_format": "list_only",
+      "output_masks": false,
+      "model": [
+        "179",
+        0
+      ],
+      "image": [
+        "112",
+        0
+      ]
+    },
+    "class_type": "GroundingDetector",
+    "_meta": {
+      "title": "Grounding Detector"
+    }
+  },
+  "179": {
+    "inputs": {
+      "model": "MM-GroundingDINO: Large O365v2+OIv6+GoldG (53.0 mAP)",
+      "keep_in_memory": true,
+      "florence2_attn": "eager"
+    },
+    "class_type": "GroundingModelLoader",
+    "_meta": {
+      "title": "Grounding Model Loader"
+    }
+  },
+  "180": {
+    "inputs": {
+      "keep_model_loaded": false,
+      "individual_objects": false,
+      "sam2_model": [
+        "182",
+        0
+      ],
+      "image": [
+        "112",
+        0
+      ],
+      "bboxes": [
+        "178",
+        0
+      ]
+    },
+    "class_type": "Sam2Segmentation",
+    "_meta": {
+      "title": "Sam2Segmentation"
+    }
+  },
+  "182": {
+    "inputs": {
+      "model": "sam2_hiera_base_plus.safetensors",
+      "segmentor": "single_image",
+      "device": "cuda",
+      "precision": "fp16"
+    },
+    "class_type": "DownloadAndLoadSAM2Model",
+    "_meta": {
+      "title": "(Down)Load SAM2Model"
+    }
+  },
+  "209": {
+    "inputs": {
+      "torchscript_jit": "on",
+      "image": [
+        "112",
+        0
+      ]
+    },
+    "class_type": "InspyrenetRembg",
+    "_meta": {
+      "title": "Inspyrenet Rembg"
+    }
+  },
+  "210": {
+    "inputs": {
+      "x": 0,
+      "y": 0,
+      "operation": "and",
+      "destination": [
+        "209",
+        1
+      ],
+      "source": [
+        "180",
+        0
+      ]
+    },
+    "class_type": "MaskComposite",
+    "_meta": {
+      "title": "MaskComposite"
+    }
+  },
+  "237": {
+    "inputs": {
+      "vae_name": "ae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "238": {
+    "inputs": {
+      "conditioning": [
+        "262",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "ConditioningZeroOut"
+    }
+  },
+  "239": {
+    "inputs": {
+      "conditioning": [
+        "262",
+        0
+      ],
+      "latent": [
+        "259",
+        0
+      ]
+    },
+    "class_type": "ReferenceLatent",
+    "_meta": {
+      "title": "ReferenceLatent"
+    }
+  },
+  "241": {
+    "inputs": {
+      "clip_name1": "clip_l.safetensors",
+      "clip_name2": "t5xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "flux",
+      "device": "default"
+    },
+    "class_type": "DualCLIPLoader",
+    "_meta": {
+      "title": "DualCLIPLoader"
+    }
+  },
+  "242": {
+    "inputs": {
+      "unet_name": "flux1-dev-kontext_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "243": {
+    "inputs": {
+      "seed": 862386227545524,
+      "steps": 25,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "242",
+        0
+      ],
+      "positive": [
+        "248",
+        0
+      ],
+      "negative": [
+        "238",
+        0
+      ],
+      "latent_image": [
+        "259",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "244": {
+    "inputs": {
+      "light_position": "Left Light",
+      "multiplier": 1,
+      "start_color": "#FFFFFF",
+      "end_color": "#FFFFFF",
+      "width": 1032,
+      "height": 1024
+    },
+    "class_type": "ImageGradient",
+    "_meta": {
+      "title": "Image Gradient"
+    }
+  },
+  "248": {
+    "inputs": {
+      "guidance": 2.5,
+      "conditioning": [
+        "239",
+        0
+      ]
+    },
+    "class_type": "FluxGuidance",
+    "_meta": {
+      "title": "FluxGuidance"
+    }
+  },
+  "249": {
+    "inputs": {
+      "samples": [
+        "243",
+        0
+      ],
+      "vae": [
+        "237",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "256": {
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "upscale_method": "nearest-exact",
+      "keep_proportion": "pad",
+      "pad_color": "0, 0, 0",
+      "crop_position": "center",
+      "divisible_by": 2,
+      "device": "cpu",
+      "image": [
+        "257",
+        0
+      ]
+    },
+    "class_type": "ImageResizeKJv2",
+    "_meta": {
+      "title": "Resize Image v2"
+    }
+  },
+  "257": {
+    "inputs": {
+      "x": 0,
+      "y": 0,
+      "resize_source": false,
+      "destination": [
+        "244",
+        0
+      ],
+      "source": [
+        "117",
+        0
+      ],
+      "mask": [
+        "117",
+        1
+      ]
+    },
+    "class_type": "ImageCompositeMasked",
+    "_meta": {
+      "title": "ImageCompositeMasked"
+    }
+  },
+  "259": {
+    "inputs": {
+      "pixels": [
+        "256",
+        0
+      ],
+      "vae": [
+        "237",
+        0
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "VAE Encode"
+    }
+  },
+  "262": {
+    "inputs": {
+      "text": "transform into a premium studio photograph of a high quality 3D asset\n\nKeep position and pose the same",
+      "clip": [
+        "241",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Positive Prompt)"
+    }
+  },
+  "264": {
+    "inputs": {
+      "torchscript_jit": "default",
+      "image": [
+        "249",
+        0
+      ]
+    },
+    "class_type": "InspyrenetRembg",
+    "_meta": {
+      "title": "Inspyrenet Rembg"
+    }
+  },
+  "266": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "264",
+        0
+      ],
+      "mask": [
+        "264",
+        1
+      ]
+    },
+    "class_type": "SaveImageWithAlpha",
+    "_meta": {
+      "title": "Save Image With Alpha"
+    }
+  },
+  "267": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "117",
+        0
+      ],
+      "mask": [
+        "117",
+        1
+      ]
+    },
+    "class_type": "SaveImageWithAlpha",
+    "_meta": {
+      "title": "Save Image With Alpha"
+    }
+  },
+  "268": {
+    "inputs": {
+      "image": [
+        "264",
+        0
+      ],
+      "alpha": [
+        "264",
+        1
+      ]
+    },
+    "class_type": "JoinImageWithAlpha",
+    "_meta": {
+      "title": "Join Image with Alpha"
+    }
+  }
+}

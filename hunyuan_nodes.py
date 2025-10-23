@@ -13,54 +13,85 @@ Powered by Tencent Hunyuan 3D 2.1
 License: Tencent Hunyuan 3D 2.1 Community License (see LICENSE_TENCENT_HUNYUAN)
 """
 
-from .model_cache import get_cache_key, get_cached_model, cache_model, clear_cache, _MODEL_CACHE
+# =============================================================================
+# Lazy Import System - Loads heavy dependencies only when needed
+# This reduces ComfyUI startup time from ~26s to <1s
+# =============================================================================
 
-from PIL import Image, ImageSequence, ImageOps
-from torch.utils.data import Dataset
-import torch
-import shutil
-import argparse
-import copy
-import torch.nn as nn
-from torch.utils.data import DataLoader
-from torchvision.utils import save_image as imwrite
-from torchvision import transforms
+# Lightweight imports (always loaded)
 import os
 import time
 import re
-import numpy as np
-import torch.nn.functional as F
-import trimesh as Trimesh
-import gc
 import json
-from .hy3dshape.hy3dshape.pipelines import Hunyuan3DDiTFlowMatchingPipeline
-from .hy3dshape.hy3dshape.postprocessors import FaceReducer, FloaterRemover, DegenerateFaceRemover
-from .hy3dshape.hy3dshape.rembg import BackgroundRemover
+import hashlib
+import gc
+import shutil
 from typing import Union, Optional, Tuple, List, Any, Callable
 from pathlib import Path
 
-#painting
-from .hy3dpaint.DifferentiableRenderer.MeshRender import MeshRender
-from .hy3dpaint.utils.simplify_mesh_utils import remesh_mesh
-from .hy3dpaint.utils.multiview_utils import multiviewDiffusionNet
-from .hy3dpaint.utils.pipeline_utils import ViewProcessor
-from .hy3dpaint.utils.image_super_utils import imageSuperNet
-from .hy3dpaint.utils.uvwrap_utils import mesh_uv_wrap
-from .hy3dpaint.convert_utils import create_glb_with_pbr_materials
-from .hy3dpaint.textureGenPipeline import Hunyuan3DPaintPipeline, Hunyuan3DPaintConfig
-from .hy3dshape.hy3dshape.models.autoencoders import ShapeVAE
+from .model_cache import get_cache_key, get_cached_model, cache_model, clear_cache, _MODEL_CACHE
 
-from .hy3dshape.hy3dshape.meshlib import postprocessmesh
-
-from spandrel import ModelLoader, ImageModelDescriptor
-
+# ComfyUI imports (lightweight)
 import folder_paths
 import node_helpers
-import hashlib
-
 import comfy.model_management as mm
-from comfy.utils import load_torch_file, ProgressBar
 import comfy.utils
+
+# =============================================================================
+# Lazy Import Cache - Heavy modules loaded on first use
+# =============================================================================
+_LAZY_IMPORTS = {}
+
+def _lazy_import(module_name):
+    """Cache and return heavy imports only when first needed"""
+    if module_name not in _LAZY_IMPORTS:
+        if module_name == "torch":
+            import torch
+            _LAZY_IMPORTS["torch"] = torch
+        elif module_name == "torch.nn":
+            import torch.nn as nn
+            _LAZY_IMPORTS["torch.nn"] = nn
+        elif module_name == "torch.nn.functional":
+            import torch.nn.functional as F
+            _LAZY_IMPORTS["torch.nn.functional"] = F
+        elif module_name == "numpy":
+            import numpy as np
+            _LAZY_IMPORTS["numpy"] = np
+        elif module_name == "trimesh":
+            import trimesh as Trimesh
+            _LAZY_IMPORTS["trimesh"] = Trimesh
+        elif module_name == "PIL.Image":
+            from PIL import Image, ImageSequence, ImageOps
+            _LAZY_IMPORTS["PIL.Image"] = Image
+            _LAZY_IMPORTS["PIL.ImageSequence"] = ImageSequence
+            _LAZY_IMPORTS["PIL.ImageOps"] = ImageOps
+        elif module_name == "hunyuan_pipeline":
+            from .hy3dshape.hy3dshape.pipelines import Hunyuan3DDiTFlowMatchingPipeline
+            _LAZY_IMPORTS["hunyuan_pipeline"] = Hunyuan3DDiTFlowMatchingPipeline
+        elif module_name == "hunyuan_postprocessors":
+            from .hy3dshape.hy3dshape.postprocessors import FaceReducer, FloaterRemover, DegenerateFaceRemover
+            _LAZY_IMPORTS["FaceReducer"] = FaceReducer
+            _LAZY_IMPORTS["FloaterRemover"] = FloaterRemover
+            _LAZY_IMPORTS["DegenerateFaceRemover"] = DegenerateFaceRemover
+        elif module_name == "hunyuan_paint":
+            from .hy3dpaint.textureGenPipeline import Hunyuan3DPaintPipeline, Hunyuan3DPaintConfig
+            _LAZY_IMPORTS["Hunyuan3DPaintPipeline"] = Hunyuan3DPaintPipeline
+            _LAZY_IMPORTS["Hunyuan3DPaintConfig"] = Hunyuan3DPaintConfig
+        elif module_name == "hunyuan_vae":
+            from .hy3dshape.hy3dshape.models.autoencoders import ShapeVAE
+            _LAZY_IMPORTS["ShapeVAE"] = ShapeVAE
+        elif module_name == "mesh_uv_wrap":
+            from .hy3dpaint.utils.uvwrap_utils import mesh_uv_wrap
+            _LAZY_IMPORTS["mesh_uv_wrap"] = mesh_uv_wrap
+        elif module_name == "meshlib":
+            from .hy3dshape.hy3dshape.meshlib import postprocessmesh
+            _LAZY_IMPORTS["postprocessmesh"] = postprocessmesh
+        elif module_name == "comfy_utils":
+            from comfy.utils import load_torch_file, ProgressBar
+            _LAZY_IMPORTS["load_torch_file"] = load_torch_file
+            _LAZY_IMPORTS["ProgressBar"] = ProgressBar
+
+    return _LAZY_IMPORTS.get(module_name)
 
 script_directory = os.path.dirname(os.path.abspath(__file__))
 comfy_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -89,6 +120,9 @@ def parse_string_to_int_list(number_string):
     return []
 
 def hy3dpaintimages_to_tensor(images):
+    np = _lazy_import("numpy")
+    torch = _lazy_import("torch")
+
     tensors = []
     for pil_img in images:
         np_img = np.array(pil_img).astype(np.uint8)
@@ -171,9 +205,14 @@ def get_filename_without_extension_os_path(full_file_path):
     
     return file_name_without_ext
 
-def _convert_texture_format(tex: Union[np.ndarray, torch.Tensor, Image.Image], 
-                          texture_size: Tuple[int, int], device: str, force_set: bool = False) -> torch.Tensor:
+def _convert_texture_format(tex,
+                          texture_size: Tuple[int, int], device: str, force_set: bool = False):
     """Unified texture format conversion logic."""
+    np = _lazy_import("numpy")
+    torch = _lazy_import("torch")
+    _lazy_import("PIL.Image")
+    Image = _LAZY_IMPORTS["PIL.Image"]
+
     if not force_set:
         if isinstance(tex, np.ndarray):
             tex = Image.fromarray((tex * 255).astype(np.uint8))
@@ -220,11 +259,15 @@ def _convert_texture_format(tex: Union[np.ndarray, torch.Tensor, Image.Image],
         return tex.to(device).float()
 
 def convert_ndarray_to_pil(texture):
+    np = _lazy_import("numpy")
+    _lazy_import("PIL.Image")
+    Image = _LAZY_IMPORTS["PIL.Image"]
+
     texture_size = len(texture)
     tex = _convert_texture_format(texture,(texture_size, texture_size),"cuda")
     tex = tex.cpu().numpy()
     processed_texture = (tex * 255).astype(np.uint8)
-    pil_texture = Image.fromarray(processed_texture)    
+    pil_texture = Image.fromarray(processed_texture)
     return pil_texture
 
 def get_filename_list(folder_name: str):
@@ -233,13 +276,21 @@ def get_filename_list(folder_name: str):
     
 # Tensor to PIL
 def tensor2pil(image):
+    np = _lazy_import("numpy")
+    _lazy_import("PIL.Image")
+    Image = _LAZY_IMPORTS["PIL.Image"]
     return Image.fromarray(np.clip(255. * image.cpu().numpy().squeeze(), 0, 255).astype(np.uint8))
 
 # PIL to Tensor
 def pil2tensor(image):
-    return torch.from_numpy(np.array(image).astype(np.float32) / 255.0).unsqueeze(0) 
+    np = _lazy_import("numpy")
+    torch = _lazy_import("torch")
+    return torch.from_numpy(np.array(image).astype(np.float32) / 255.0).unsqueeze(0)
 
 def numpy2pil(image):
+    np = _lazy_import("numpy")
+    _lazy_import("PIL.Image")
+    Image = _LAZY_IMPORTS["PIL.Image"]
     return Image.fromarray(np.clip(255. * image.squeeze(), 0, 255).astype(np.uint8))    
 
 def convert_pil_images_to_tensor(images):
@@ -292,6 +343,10 @@ class Hy3DMeshGenerator:
     CATEGORY = "Hunyuan3D21Wrapper"
 
     def loadmodel(self, model, image, steps, guidance_scale, seed, attention_mode, use_cache):
+        torch = _lazy_import("torch")
+        _lazy_import("hunyuan_pipeline")
+        Hunyuan3DDiTFlowMatchingPipeline = _LAZY_IMPORTS["hunyuan_pipeline"]
+
         device = mm.get_torch_device()
         seed = seed % (2**32)
         model_path = folder_paths.get_full_path("diffusion_models", model)
@@ -309,13 +364,13 @@ class Hy3DMeshGenerator:
                 print(f"🔄 Loading pipeline: {model} (cache disabled)")
             else:
                 print(f"🔥 Loading pipeline: {model} (first time or settings changed)")
-            
+
             self.pipeline = Hunyuan3DDiTFlowMatchingPipeline.from_single_file(
                 config_path=os.path.join(script_directory, 'configs', 'dit_config_2_1.yaml'),
                 ckpt_path=model_path,
                 attention_mode=attention_mode
             )
-            
+
             # Only update tracking vars if caching is enabled
             if use_cache:
                 self.current_model_path = model_path
@@ -324,7 +379,7 @@ class Hy3DMeshGenerator:
             print("⚡ Using cached pipeline (fast!)")
 
         self.pipeline.to(device)
-        
+
         image = tensor2pil(image)
         latents = self.pipeline(
             image=image,
@@ -364,12 +419,16 @@ class Hy3DMultiViewsGenerator:
     CATEGORY = "Hunyuan3D21Wrapper"
 
     def genmultiviews(self, trimesh, camera_config, view_size, image, steps, guidance_scale, texture_size, unwrap_mesh, seed, use_cache=True):
+        _lazy_import("hunyuan_paint")
+        Hunyuan3DPaintConfig = _LAZY_IMPORTS["Hunyuan3DPaintConfig"]
+        Hunyuan3DPaintPipeline = _LAZY_IMPORTS["Hunyuan3DPaintPipeline"]
+
         device = mm.get_torch_device()
         seed = seed % (2**32)
 
         # Create config hash for comparison
         config_str = f"{view_size}_{camera_config}_{texture_size}"
-        
+
         should_load = (
             not use_cache or
             self.paint_pipeline is None or
@@ -381,7 +440,7 @@ class Hy3DMultiViewsGenerator:
                 print("🔄 Creating paint pipeline (cache disabled)")
             else:
                 print("🔥 Creating paint pipeline (first time or config changed)")
-            
+
             conf = Hunyuan3DPaintConfig(
                 view_size,
                 camera_config["selected_camera_azims"],
@@ -391,25 +450,25 @@ class Hy3DMultiViewsGenerator:
                 texture_size
             )
             self.paint_pipeline = Hunyuan3DPaintPipeline(conf)
-            
+
             if use_cache:
                 self.current_config = config_str
         else:
             print("⚡ Using cached paint pipeline (fast!)")
-        
+
         image = tensor2pil(image)
-        
+
         temp_folder_path = os.path.join(comfy_path, "temp")
-        os.makedirs(temp_folder_path, exist_ok=True)        
+        os.makedirs(temp_folder_path, exist_ok=True)
         temp_output_path = os.path.join(temp_folder_path, "textured_mesh.obj")
-        
+
         albedo, mr, normal_maps, position_maps = self.paint_pipeline(mesh=trimesh, image_path=image, output_mesh_path=temp_output_path, num_steps=steps, guidance_scale=guidance_scale, unwrap=unwrap_mesh, seed=seed)
-        
+
         albedo_tensor = hy3dpaintimages_to_tensor(albedo)
         mr_tensor = hy3dpaintimages_to_tensor(mr)
         normals_tensor = hy3dpaintimages_to_tensor(normal_maps)
-        positions_tensor = hy3dpaintimages_to_tensor(position_maps)            
-        
+        positions_tensor = hy3dpaintimages_to_tensor(position_maps)
+
         return (self.paint_pipeline, albedo_tensor, mr_tensor, positions_tensor, normals_tensor, camera_config,)       
         
 class Hy3DBakeMultiViews:
@@ -468,35 +527,37 @@ class Hy3DInPaint:
     OUTPUT_NODE = True
 
     def process(self, pipeline, albedo, albedo_mask, mr, mr_mask, output_mesh_name):
-        
+        torch = _lazy_import("torch")
+        Trimesh = _lazy_import("trimesh")
+
         #albedo = tensor2pil(albedo)
         #albedo_mask = tensor2pil(albedo_mask)
         #mr = tensor2pil(mr)
-        #mr_mask = tensor2pil(mr_mask)       
-        
+        #mr_mask = tensor2pil(mr_mask)
+
         vertex_inpaint = True
-        method = "NS"       
-        
+        method = "NS"
+
         albedo, mr = pipeline.inpaint(albedo, albedo_mask, mr, mr_mask, vertex_inpaint, method)
-        
+
         pipeline.set_texture_albedo(albedo)
         pipeline.set_texture_mr(mr)
 
         temp_folder_path = os.path.join(comfy_path, "temp")
-        os.makedirs(temp_folder_path, exist_ok=True)        
+        os.makedirs(temp_folder_path, exist_ok=True)
         output_mesh_path = os.path.join(temp_folder_path, f"{output_mesh_name}.obj")
         output_temp_path = pipeline.save_mesh(output_mesh_path)
-        
+
         output_glb_path = os.path.join(comfy_path, "output", f"{output_mesh_name}.glb")
         shutil.copyfile(output_temp_path, output_glb_path)
-        
+
         trimesh = Trimesh.load(output_glb_path, force="mesh")
-        
+
         texture_pil = convert_ndarray_to_pil(albedo)
         texture_mr_pil = convert_ndarray_to_pil(mr)
         texture_tensor = pil2tensor(texture_pil)
         texture_mr_tensor = pil2tensor(texture_mr_pil)
-        
+
         output_glb_path = f"{output_mesh_name}.glb"
 
         # Don't call clean_memory() - we're caching the pipeline for reuse!
@@ -504,8 +565,8 @@ class Hy3DInPaint:
 
         mm.soft_empty_cache()
         torch.cuda.empty_cache()
-        gc.collect()        
-        
+        gc.collect()
+
         return (texture_tensor, texture_mr_tensor, trimesh, output_glb_path)         
         
 class Hy3D21CameraConfig:
@@ -563,6 +624,12 @@ class Hy3D21VAELoader:
     CATEGORY = "Hunyuan3D21Wrapper"
 
     def loadmodel(self, model_name, use_cache=True, vae_config=None):
+        torch = _lazy_import("torch")
+        _lazy_import("comfy_utils")
+        load_torch_file = _LAZY_IMPORTS["load_torch_file"]
+        _lazy_import("hunyuan_vae")
+        ShapeVAE = _LAZY_IMPORTS["ShapeVAE"]
+
         device = mm.get_torch_device()
         model_path = folder_paths.get_full_path("vae", model_name)
 
@@ -589,7 +656,7 @@ class Hy3D21VAELoader:
 
         # Hash the config
         config_hash = hashlib.md5(str(sorted(vae_config.items())).encode()).hexdigest()
-        
+
         should_load = (
             not use_cache or
             self.vae is None or
@@ -607,7 +674,7 @@ class Hy3D21VAELoader:
             self.vae = ShapeVAE(**vae_config)
             self.vae.load_state_dict(vae_sd)
             self.vae.eval().to(torch.float16)
-            
+
             if use_cache:
                 self.current_model_path = model_path
                 self.current_config_hash = config_hash
@@ -694,6 +761,9 @@ class Hy3D21VAEDecode:
     CATEGORY = "Hunyuan3D21Wrapper"
 
     def process(self, vae, latents, box_v, octree_resolution, mc_level, num_chunks, mc_algo, enable_flash_vdm, force_offload):
+        torch = _lazy_import("torch")
+        Trimesh = _lazy_import("trimesh")
+
         device = mm.get_torch_device()
         offload_device = mm.unet_offload_device()
 
@@ -701,9 +771,9 @@ class Hy3D21VAEDecode:
         torch.cuda.empty_cache()
 
         vae.to(device)
-        
+
         vae.enable_flashvdm_decoder(enabled=enable_flash_vdm, mc_algo=mc_algo)
-        
+
         latents = vae.decode(latents)
         outputs = vae.latents2mesh(
             latents,
@@ -715,21 +785,21 @@ class Hy3D21VAEDecode:
             mc_algo=mc_algo,
             enable_pbar=True
         )[0]
-        
+
         # if force_offload==True:
         #     vae.to(offload_device)
-        
+
         outputs.mesh_f = outputs.mesh_f[:, ::-1]
         mesh_output = Trimesh.Trimesh(outputs.mesh_v, outputs.mesh_f)
         print(f"Decoded mesh with {mesh_output.vertices.shape[0]} vertices and {mesh_output.faces.shape[0]} faces")
-        
+
         #del pipeline
         # del vae
-        
+
         # mm.soft_empty_cache()
         # torch.cuda.empty_cache()
         gc.collect()
-        
+
         return (mesh_output, )        
         
 class Hy3D21ResizeImages:
@@ -749,7 +819,11 @@ class Hy3D21ResizeImages:
     FUNCTION = "process"
     CATEGORY = "Hunyuan3D21Wrapper"
 
-    def process(self, images, width, height, sampling):        
+    def process(self, images, width, height, sampling):
+        torch = _lazy_import("torch")
+        _lazy_import("PIL.Image")
+        Image = _LAZY_IMPORTS["PIL.Image"]
+
         if sampling=='NEAREST':
             resampling = Image.Resampling.NEAREST
         elif sampling=='LANCZOS':
@@ -764,7 +838,7 @@ class Hy3D21ResizeImages:
             resampling = Image.Resampling.HAMMING
         else:
             raise Exception('Unknown sampling')
-        
+
         if isinstance(images, List):
             for i in range(len(images)):
                 if isinstance(images[i], torch.Tensor):
@@ -802,6 +876,13 @@ class Hy3D21LoadImageWithTransparency:
     RETURN_NAMES = ("image", "mask", "image_with_alpha")
     FUNCTION = "load_image"
     def load_image(self, image):
+        _lazy_import("PIL.Image")
+        Image = _LAZY_IMPORTS["PIL.Image"]
+        ImageSequence = _LAZY_IMPORTS["PIL.ImageSequence"]
+        ImageOps = _LAZY_IMPORTS["PIL.ImageOps"]
+        torch = _lazy_import("torch")
+        np = _lazy_import("numpy")
+
         image_path = folder_paths.get_annotated_filepath(image)
 
         img = node_helpers.pillow(Image.open, image_path)
@@ -889,6 +970,12 @@ class Hy3D21PostprocessMesh:
     CATEGORY = "Hunyuan3D21Wrapper"
 
     def process(self, trimesh, remove_floaters, remove_degenerate_faces, reduce_faces, max_facenum, smooth_normals, smooth_surface):
+        _lazy_import("hunyuan_postprocessors")
+        FloaterRemover = _LAZY_IMPORTS["FloaterRemover"]
+        DegenerateFaceRemover = _LAZY_IMPORTS["DegenerateFaceRemover"]
+        FaceReducer = _LAZY_IMPORTS["FaceReducer"]
+        Trimesh = _lazy_import("trimesh")
+
         new_mesh = trimesh.copy()
         if remove_floaters:
             new_mesh = FloaterRemover()(new_mesh)
@@ -899,7 +986,7 @@ class Hy3D21PostprocessMesh:
         if reduce_faces:
             new_mesh = FaceReducer()(new_mesh, max_facenum=max_facenum)
             print(f"Reduced faces, resulting in {new_mesh.vertices.shape[0]} vertices and {new_mesh.faces.shape[0]} faces")
-        if smooth_normals:              
+        if smooth_normals:
             new_mesh.vertex_normals = Trimesh.smoothing.get_vertices_normals(new_mesh)
         if smooth_surface:
             new_mesh = Trimesh.smoothing.filter_laplacian(new_mesh, iterations=3)
@@ -954,8 +1041,11 @@ class Hy3D21MeshUVWrap:
     CATEGORY = "Hunyuan3D21Wrapper"
 
     def process(self, trimesh):
+        _lazy_import("mesh_uv_wrap")
+        mesh_uv_wrap = _LAZY_IMPORTS["mesh_uv_wrap"]
+
         trimesh = mesh_uv_wrap(trimesh)
-        
+
         return (trimesh,)        
         
 class Hy3D21LoadMesh:
@@ -975,12 +1065,13 @@ class Hy3D21LoadMesh:
     DESCRIPTION = "Loads a glb model from the given path."
 
     def load(self, glb_path):
+        Trimesh = _lazy_import("trimesh")
 
         if not os.path.exists(glb_path):
             glb_path = os.path.join(folder_paths.get_input_directory(), glb_path)
-        
+
         trimesh = Trimesh.load(glb_path, force="mesh")
-        
+
         return (trimesh,)
         
 class Hy3D21IMRemesh:
@@ -1005,6 +1096,11 @@ class Hy3D21IMRemesh:
     DESCRIPTION = "Remeshes the mesh using instant-meshes: https://github.com/wjakob/instant-meshes, Note: this will remove all vertex colors and textures."
 
     def remesh(self, trimesh, merge_vertices, vertex_count, smooth_iter, align_to_boundaries, triangulate_result, max_facenum):
+        np = _lazy_import("numpy")
+        Trimesh = _lazy_import("trimesh")
+        _lazy_import("hunyuan_postprocessors")
+        FaceReducer = _LAZY_IMPORTS["FaceReducer"]
+
         try:
             import pynanoinstantmeshes as PyNIM
         except ImportError:
@@ -1026,7 +1122,7 @@ class Hy3D21IMRemesh:
         new_verts = new_verts.astype(np.float32)
         if triangulate_result:
             new_faces = Trimesh.geometry.triangulate_quads(new_faces)
-        
+
         if len(new_mesh.faces) > max_facenum:
             new_mesh = FaceReducer()(new_mesh, max_facenum=max_facenum)
 
@@ -1068,6 +1164,9 @@ class Hy3D21MeshlibDecimate:
     DESCRIPTION = "Decimate the mesh using meshlib: https://meshlib.io/"
 
     def decimate(self, trimesh, subdivideParts, target_face_num=0,target_face_ratio=0.0,strategy="None",maxError=0.0,maxEdgeLen=0.0,maxBdShift=0.0,maxTriangleAspectRatio=0.0,criticalTriAspectRatio=0.0,tinyEdgeLength=0.0,stabilizer=0.0,angleWeightedDistToPlane=False,optimizeVertexPos=False,collapseNearNotFlippable=False,touchNearBdEdges=False,maxAngleChange=0.0,decimateBetweenParts=False,minFacesInPart=0):
+        _lazy_import("meshlib")
+        postprocessmesh = _LAZY_IMPORTS["postprocessmesh"]
+
         try:
             import meshlib.mrmeshpy as mrmeshpy
         except ImportError:
@@ -1089,12 +1188,12 @@ class Hy3D21MeshlibDecimate:
             settings.maxDeletedFaces = faces_to_delete
         else:
             raise ValueError('target_face_num or target_face_ratio must be set')
-        
+
         if strategy == "MinimizeError":
             settings.strategy = mrmeshpy.DecimateStrategy.MinimizeError
         elif strategy == "ShortestEdgeFirst":
             settings.strategy = mrmeshpy.DecimateStrategy.ShortestEdgeFirst
-            
+
         if maxError > 0.0:
             settings.maxError = maxError
         if maxEdgeLen > 0.0:
@@ -1123,12 +1222,12 @@ class Hy3D21MeshlibDecimate:
             settings.decimateBetweenParts = decimateBetweenParts
         if minFacesInPart > 0:
             settings.minFacesInPart = minFacesInPart
-            
+
         settings.packMesh = True
         settings.subdivideParts = subdivideParts
-            
+
         new_mesh = postprocessmesh(trimesh.vertices, trimesh.faces, settings)
-        
+
         return (new_mesh, )    
         
 class Hy3D21SimpleMeshlibDecimate:
@@ -1152,6 +1251,9 @@ class Hy3D21SimpleMeshlibDecimate:
     DESCRIPTION = "Decimate the mesh using meshlib: https://meshlib.io/"
 
     def decimate(self, trimesh, subdivideParts, target_face_num=0,target_face_ratio=0.0):
+        _lazy_import("meshlib")
+        postprocessmesh = _LAZY_IMPORTS["postprocessmesh"]
+
         try:
             import meshlib.mrmeshpy as mrmeshpy
         except ImportError:
@@ -1172,13 +1274,13 @@ class Hy3D21SimpleMeshlibDecimate:
             faces_to_delete = current_faces_num - target_faces
             settings.maxDeletedFaces = faces_to_delete
         else:
-            raise ValueError('target_face_num or target_face_ratio must be set')        
-            
+            raise ValueError('target_face_num or target_face_ratio must be set')
+
         settings.packMesh = True
         settings.subdivideParts = subdivideParts
-            
+
         new_mesh = postprocessmesh(trimesh.vertices, trimesh.faces, settings)
-        
+
         return (new_mesh, )  
 
 class Hy3D21UseMultiViews:
@@ -1201,13 +1303,17 @@ class Hy3D21UseMultiViews:
     CATEGORY = "Hunyuan3D21Wrapper"
 
     def process(self, trimesh, camera_config, albedo, mr, view_size, texture_size):
+        _lazy_import("hunyuan_paint")
+        Hunyuan3DPaintConfig = _LAZY_IMPORTS["Hunyuan3DPaintConfig"]
+        Hunyuan3DPaintPipeline = _LAZY_IMPORTS["Hunyuan3DPaintPipeline"]
+
         device = mm.get_torch_device()
         offload_device=mm.unet_offload_device()
-        
+
         conf = Hunyuan3DPaintConfig(view_size, camera_config["selected_camera_azims"], camera_config["selected_camera_elevs"], camera_config["selected_view_weights"], camera_config["ortho_scale"], texture_size)
         paint_pipeline = Hunyuan3DPaintPipeline(conf)
         paint_pipeline.load_mesh(trimesh)
-        
+
         return (paint_pipeline, albedo, mr, camera_config)
 
 class Hy3D21UseMultiViewsFromMetaData:
@@ -1228,32 +1334,38 @@ class Hy3D21UseMultiViewsFromMetaData:
     CATEGORY = "Hunyuan3D21Wrapper"
 
     def process(self, trimesh, metadata_file, view_size, texture_size):
+        _lazy_import("PIL.Image")
+        Image = _LAZY_IMPORTS["PIL.Image"]
+        _lazy_import("hunyuan_paint")
+        Hunyuan3DPaintConfig = _LAZY_IMPORTS["Hunyuan3DPaintConfig"]
+        Hunyuan3DPaintPipeline = _LAZY_IMPORTS["Hunyuan3DPaintPipeline"]
+
         device = mm.get_torch_device()
         offload_device=mm.unet_offload_device()
-        
+
         with open(metadata_file, 'r') as fr:
             loaded_data = json.load(fr)
             loaded_metaData = MetaData()
             for key, value in loaded_data.items():
-                setattr(loaded_metaData, key, value)        
-        
+                setattr(loaded_metaData, key, value)
+
         conf = Hunyuan3DPaintConfig(view_size, loaded_metaData.camera_config["selected_camera_azims"], loaded_metaData.camera_config["selected_camera_elevs"], loaded_metaData.camera_config["selected_view_weights"], loaded_metaData.camera_config["ortho_scale"], texture_size)
         paint_pipeline = Hunyuan3DPaintPipeline(conf)
-              
+
         paint_pipeline.load_mesh(trimesh)
-        
+
         dir_name = os.path.dirname(metadata_file)
-        
+
         albedos = []
         mrs = []
-        
+
         if loaded_metaData.albedos_upscaled != None:
             print('Using upscaled pictures ...')
             for file in loaded_metaData.albedos_upscaled:
                 albedo_file = os.path.join(dir_name,file)
                 albedo = Image.open(albedo_file)
                 albedos.append(albedo)
-                
+
             for file in loaded_metaData.mrs_upscaled:
                 mr_file = os.path.join(dir_name,file)
                 mr = Image.open(mr_file)
@@ -1264,7 +1376,7 @@ class Hy3D21UseMultiViewsFromMetaData:
                 albedo_file = os.path.join(dir_name,file)
                 albedo = Image.open(albedo_file)
                 albedos.append(albedo)
-                
+
             for file in loaded_metaData.mrs:
                 mr_file = os.path.join(dir_name,file)
                 mr = Image.open(mr_file)
@@ -1272,7 +1384,7 @@ class Hy3D21UseMultiViewsFromMetaData:
 
         albedos_tensor = convert_pil_images_to_tensor(albedos)
         mrs_tensor = convert_pil_images_to_tensor(mrs)
-        
+
         return (paint_pipeline, albedos_tensor, mrs_tensor, loaded_metaData.camera_config)     
 
 class Hy3D21MultiViewsGeneratorWithMetaData:
@@ -1299,11 +1411,15 @@ class Hy3D21MultiViewsGeneratorWithMetaData:
     CATEGORY = "Hunyuan3D21Wrapper"
 
     def genmultiviews(self, trimesh, camera_config, view_size, image, steps, guidance_scale, texture_size, unwrap_mesh, seed, output_name):
+        _lazy_import("hunyuan_paint")
+        Hunyuan3DPaintConfig = _LAZY_IMPORTS["Hunyuan3DPaintConfig"]
+        Hunyuan3DPaintPipeline = _LAZY_IMPORTS["Hunyuan3DPaintPipeline"]
+
         device = mm.get_torch_device()
         offload_device=mm.unet_offload_device()
-        
+
         seed = seed % (2**32)
-        
+
         conf = Hunyuan3DPaintConfig(view_size, camera_config["selected_camera_azims"], camera_config["selected_camera_elevs"], camera_config["selected_view_weights"], camera_config["ortho_scale"], texture_size)
         paint_pipeline = Hunyuan3DPaintPipeline(conf)
         
@@ -1361,48 +1477,50 @@ class Hy3DBakeMultiViewsWithMetaData:
     FUNCTION = "process"
     CATEGORY = "Hunyuan3D21Wrapper"
 
-    def process(self, pipeline, albedo, mr, metadata):  
+    def process(self, pipeline, albedo, mr, metadata):
+        Trimesh = _lazy_import("trimesh")
+
         vertex_inpaint = True
-        method = "NS"       
-        
+        method = "NS"
+
         albedo = convert_tensor_images_to_pil(albedo)
         mr = convert_tensor_images_to_pil(mr)
-        
+
         output_mesh_name = metadata.mesh_file
         output_dir_path = os.path.join(comfy_path, "output", "3D", output_mesh_name)
-        
+
         #detect if images have been upscaled
         albedo1 = albedo[0]
         width, height = albedo1.size
         if width>pipeline.config.resolution:
-            print('Upscaled images detected. Saving Upscaled images ...')            
+            print('Upscaled images detected. Saving Upscaled images ...')
             metadata.albedos_upscaled = []
             metadata.mrs_upscaled = []
-            
+
             for index, img in enumerate(albedo):
                 output_file_path = os.path.join(output_dir_path,f'Albedo_Upscaled_{index}.png')
                 img.save(output_file_path)
                 metadata.albedos_upscaled.append(f'Albedo_Upscaled_{index}.png')
-                
+
             for index, img in enumerate(mr):
                 output_file_path = os.path.join(output_dir_path,f'MR_Upscaled_{index}.png')
                 img.save(output_file_path)
-                metadata.mrs_upscaled.append(f'MR_Upscaled_{index}.png')                
-        
+                metadata.mrs_upscaled.append(f'MR_Upscaled_{index}.png')
+
         camera_config = metadata.camera_config
         texture, mask, texture_mr, mask_mr = pipeline.bake_from_multiview(albedo,mr,camera_config["selected_camera_elevs"], camera_config["selected_camera_azims"], camera_config["selected_view_weights"])
-        
+
         albedo, mr = pipeline.inpaint(texture, mask, texture_mr, mask_mr, vertex_inpaint, method)
-        
+
         pipeline.set_texture_albedo(albedo)
         pipeline.set_texture_mr(mr)
-                        
+
         output_glb_path = os.path.join(output_dir_path,f'{output_mesh_name}.obj')
-        
+
         pipeline.save_mesh(output_glb_path)
 
         output_glb_path = os.path.join(output_dir_path,f'{output_mesh_name}.glb')
-        
+
         trimesh = Trimesh.load(output_glb_path)
         
         texture_pil = convert_ndarray_to_pil(albedo)
@@ -1443,48 +1561,59 @@ class Hy3DHighPolyToLowPolyBakeMultiViewsWithMetaData:
     CATEGORY = "Hunyuan3D21Wrapper"
     OUTPUT_NODE = True
 
-    def process(self, metadata_file, view_size, texture_size, target_face_nums):   
+    def process(self, metadata_file, view_size, texture_size, target_face_nums):
+        _lazy_import("PIL.Image")
+        Image = _LAZY_IMPORTS["PIL.Image"]
+        Trimesh = _lazy_import("trimesh")
+        _lazy_import("hunyuan_paint")
+        Hunyuan3DPaintConfig = _LAZY_IMPORTS["Hunyuan3DPaintConfig"]
+        Hunyuan3DPaintPipeline = _LAZY_IMPORTS["Hunyuan3DPaintPipeline"]
+        _lazy_import("mesh_uv_wrap")
+        mesh_uv_wrap = _LAZY_IMPORTS["mesh_uv_wrap"]
+        _lazy_import("meshlib")
+        postprocessmesh = _LAZY_IMPORTS["postprocessmesh"]
+
         try:
             import meshlib.mrmeshpy as mrmeshpy
         except ImportError:
             raise ImportError("meshlib not found. Please install it using 'pip install meshlib'")
-            
+
         device = mm.get_torch_device()
         offload_device=mm.unet_offload_device()
         output_lowpoly_path = ""
-        
+
         vertex_inpaint = True
         method = "NS"
-        
+
         with open(metadata_file, 'r') as fr:
             loaded_data = json.load(fr)
             loaded_metaData = MetaData()
             for key, value in loaded_data.items():
-                setattr(loaded_metaData, key, value)        
-        
+                setattr(loaded_metaData, key, value)
+
         list_of_faces = parse_string_to_int_list(target_face_nums)
         if len(list_of_faces)>0:
             input_dir = os.path.dirname(metadata_file)
             mesh_name = loaded_metaData.mesh_file.replace(".glb","").replace(".obj","")
             mesh_file_path = os.path.join(input_dir, loaded_metaData.mesh_file)
-            
+
             if os.path.exists(mesh_file_path):
                 conf = Hunyuan3DPaintConfig(view_size, loaded_metaData.camera_config["selected_camera_azims"], loaded_metaData.camera_config["selected_camera_elevs"], loaded_metaData.camera_config["selected_view_weights"], loaded_metaData.camera_config["ortho_scale"], texture_size)
-                
+
                 highpoly_mesh = Trimesh.load(mesh_file_path, force="mesh")
                 highpoly_mesh = Trimesh.Trimesh(vertices=highpoly_mesh.vertices, faces=highpoly_mesh.faces) # Remove texture coordinates
                 highpoly_faces_num = highpoly_mesh.faces.shape[0]
-                
+
                 albedos = []
                 mrs = []
-                
+
                 if loaded_metaData.albedos_upscaled != None:
                     print('Using upscaled pictures ...')
                     for file in loaded_metaData.albedos_upscaled:
                         albedo_file = os.path.join(input_dir,file)
                         albedo = Image.open(albedo_file)
                         albedos.append(albedo)
-                        
+
                     for file in loaded_metaData.mrs_upscaled:
                         mr_file = os.path.join(input_dir,file)
                         mr = Image.open(mr_file)
@@ -1495,14 +1624,14 @@ class Hy3DHighPolyToLowPolyBakeMultiViewsWithMetaData:
                         albedo_file = os.path.join(input_dir,file)
                         albedo = Image.open(albedo_file)
                         albedos.append(albedo)
-                        
+
                     for file in loaded_metaData.mrs:
                         mr_file = os.path.join(dir_name,file)
                         mr = Image.open(mr_file)
                         mrs.append(mr)
 
                 output_lowpoly_path = os.path.join(input_dir, "LowPoly")
-                
+
                 for target_face_num in list_of_faces:
                     print('Processing {target_face_num} faces ...')
                     pipeline = Hunyuan3DPaintPipeline(conf)
@@ -1575,6 +1704,9 @@ class Hy3D21ImageWithAlphaInput:
 
 def reducefacesnano(new_mesh, max_facenum):
     """Face reduction using Instant Meshes (pynanoinstantmeshes)"""
+    np = _lazy_import("numpy")
+    Trimesh = _lazy_import("trimesh")
+
     try:
         import pynanoinstantmeshes as PyNIM
 

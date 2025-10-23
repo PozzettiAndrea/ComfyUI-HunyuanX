@@ -45,6 +45,78 @@ cd ComfyUI-MeshCraft
 pip install -r requirements.txt
 ```
 
+**Step 3: Compile Extensions (for Hunyuan 3D nodes)**
+
+The Hunyuan 3D nodes require two compiled extensions: `custom_rasterizer` (CUDA) and `DifferentiableRenderer` (C++).
+
+**Option A: Use Precompiled Wheels (Recommended)**
+
+If precompiled wheels are available for your Python version:
+
+```bash
+# Find your Python version
+python --version
+
+# Install custom_rasterizer (example for Python 3.12)
+pip install hy3dpaint/custom_rasterizer/dist/custom_rasterizer-0.1-cp312-cp312-linux_x86_64.whl
+
+# Install DifferentiableRenderer (example for Python 3.12)
+pip install hy3dpaint/DifferentiableRenderer/dist/mesh_inpaint_processor-0.0.0-cp312-cp312-linux_x86_64.whl
+```
+
+**Option B: Automated Compilation (Advanced Users)**
+
+Use the automated compilation script that checks prerequisites and compiles both modules:
+
+```bash
+cd ComfyUI/custom_nodes/ComfyUI-MeshCraft
+./compile_extensions.sh
+```
+
+**Prerequisites for compilation:**
+- NVIDIA CUDA Toolkit (with `nvcc`)
+- G++ compiler version 12+ (recommended)
+- Python 3.10+
+- PyTorch with CUDA support
+- pybind11 (`pip install pybind11`)
+
+**Script options:**
+```bash
+# Show help
+./compile_extensions.sh --help
+
+# Verbose mode (see detailed compilation output)
+./compile_extensions.sh --verbose
+
+# Force compilation even if some prerequisites are missing
+./compile_extensions.sh --force
+
+# Skip import verification after compilation
+./compile_extensions.sh --skip-verify
+```
+
+The script will:
+1. Check all prerequisites (nvcc, g++, Python, PyTorch CUDA, pybind11)
+2. Check optional dependencies (Blender for UV unwrapping)
+3. Compile custom_rasterizer (CUDA extension)
+4. Compile DifferentiableRenderer (C++ extension)
+5. Verify both modules can be imported
+6. Report success or provide detailed error messages
+
+**Option C: Manual Compilation (Expert Users)**
+
+If you prefer manual control:
+
+```bash
+# Compile custom_rasterizer
+cd hy3dpaint/custom_rasterizer
+python setup.py install
+
+# Compile DifferentiableRenderer
+cd ../DifferentiableRenderer
+python setup.py install
+```
+
 Restart ComfyUI after installation.
 
 ## Nodes
@@ -72,11 +144,25 @@ Advanced mesh post-processing with multiple optimization options.
 
 ## Requirements
 
+### Core Requirements
 - Python 3.10+
 - ComfyUI
-- trimesh
-- numpy
-- pynanoinstantmeshes
+- See `requirements.txt` for Python package dependencies
+
+### For Hunyuan 3D Nodes (Compilation)
+- NVIDIA GPU with CUDA support
+- NVIDIA CUDA Toolkit (nvcc compiler)
+- G++ compiler version 12+ (recommended)
+- PyTorch with CUDA support
+- pybind11
+
+**Note**: Precompiled wheels are available in the `dist/` folders for common Python versions, which eliminates the need for compilation tools.
+
+### Optional Requirements
+- **Blender** (for UV unwrapping): Required for `Hy3DUVUnwrapper` node and texture generation with UV unwrapping
+  - Install from: https://www.blender.org/download/
+  - Must be available in system PATH as `blender` command
+  - Used for Smart UV Project unwrapping via background subprocess
 
 ## Roadmap
 
