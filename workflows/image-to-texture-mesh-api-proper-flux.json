@@ -51,7 +51,7 @@
       "guidance_scale": 3,
       "texture_size": 1024,
       "unwrap_mesh": false,
-      "seed": 1014674437902746,
+      "seed": 1112536848015067,
       "use_cache": true,
       "trimesh": [
         "45",
@@ -100,7 +100,7 @@
       "model": "hunyuan3d-dit-v2-1-fp16.ckpt",
       "steps": 50,
       "guidance_scale": 8.5,
-      "seed": 165204556603755,
+      "seed": 280720417056487,
       "attention_mode": "sageattn",
       "use_cache": true,
       "image": [
@@ -197,15 +197,6 @@
       "title": "Preview Image"
     }
   },
-  "88": {
-    "inputs": {
-      "value": 25000
-    },
-    "class_type": "INTConstant",
-    "_meta": {
-      "title": "INT Constant"
-    }
-  },
   "89": {
     "inputs": {
       "string": "whatever"
@@ -230,7 +221,7 @@
   },
   "112": {
     "inputs": {
-      "image": "unnamed (2).jpg"
+      "image": "unnamed.jpg"
     },
     "class_type": "LoadImage",
     "_meta": {
@@ -321,15 +312,6 @@
       "title": "Preview 3D"
     }
   },
-  "128": {
-    "inputs": {
-      "model_name": "SwinIR-Helaman-Lexica-2x.pth"
-    },
-    "class_type": "UpscaleModelLoader",
-    "_meta": {
-      "title": "Load Upscale Model"
-    }
-  },
   "129": {
     "inputs": {
       "model_file": [
@@ -408,24 +390,6 @@
       "title": "ImageCompositeMasked"
     }
   },
-  "152": {
-    "inputs": {
-      "model_name": "GroundingDINO_SwinB (938MB)"
-    },
-    "class_type": "GroundingDinoModelLoader (segment anything2)",
-    "_meta": {
-      "title": "GroundingDinoModelLoader (segment anything2)"
-    }
-  },
-  "154": {
-    "inputs": {
-      "model_name": "sam2_hiera_large.pt"
-    },
-    "class_type": "SAM2ModelLoader (segment anything2)",
-    "_meta": {
-      "title": "SAM2ModelLoader (segment anything2)"
-    }
-  },
   "155": {
     "inputs": {
       "output": "",
@@ -447,15 +411,6 @@
     "class_type": "CR Split String",
     "_meta": {
       "title": "🔤 CR Split String"
-    }
-  },
-  "160": {
-    "inputs": {
-      "model_name": "4x-UltraSharpV2.safetensors"
-    },
-    "class_type": "UpscaleModelLoader",
-    "_meta": {
-      "title": "Load Upscale Model"
     }
   },
   "165": {
@@ -722,7 +677,7 @@
   },
   "283": {
     "inputs": {
-      "seed": 487219886986542,
+      "seed": 973326309878427,
       "steps": 25,
       "cfg": 1,
       "sampler_name": "euler",
