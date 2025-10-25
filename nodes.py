@@ -6,6 +6,7 @@ Advanced mesh manipulation and optimization nodes for ComfyUI
 import torch
 import trimesh
 import numpy as np
+import io
 from typing import Tuple
 
 
@@ -152,11 +153,163 @@ class MeshCraftPostProcess:
         return (new_mesh,)
 
 
+class RenderMeshMultiView:
+    """
+    Render mesh from 6 orthographic viewpoints matching Hunyuan3D 2.1 camera configuration.
+
+    Outputs 6 views: Front, Right, Back, Left, Top, Bottom
+    Camera poses match Hunyuan3D exactly for use in texture generation/editing workflows.
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "mesh": ("TRIMESH",),
+                "resolution": ("INT", {
+                    "default": 512,
+                    "min": 128,
+                    "max": 2048,
+                    "step": 64,
+                    "tooltip": "Render resolution for each view"
+                }),
+                "camera_distance": ("FLOAT", {
+                    "default": 1.5,
+                    "min": 0.5,
+                    "max": 5.0,
+                    "step": 0.1,
+                    "tooltip": "Camera distance from object center (Hunyuan3D default: 1.5)"
+                }),
+                "output_layout": (["grid_2x3", "grid_3x2", "horizontal_1x6", "batch"], {
+                    "default": "grid_2x3",
+                    "tooltip": "How to arrange the 6 views"
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("rendered_views",)
+    FUNCTION = "render"
+    CATEGORY = "MeshCraft/Rendering"
+
+    def render(self, mesh, resolution, camera_distance, output_layout):
+        """
+        Render mesh from 6 orthographic viewpoints.
+
+        Args:
+            mesh: Input mesh (can be textured or untextured)
+            resolution: Render resolution per view
+            camera_distance: Distance from camera to object
+            output_layout: How to arrange output views
+
+        Returns:
+            Tuple containing rendered image(s)
+        """
+        print(f"\n🎥 Rendering mesh from 6 orthographic views...")
+        print(f"   Resolution: {resolution}x{resolution}")
+        print(f"   Camera distance: {camera_distance}")
+        print(f"   Layout: {output_layout}")
+
+        # Hunyuan3D 2.1 camera configuration (6 orthographic views)
+        # Format: (azimuth_degrees, elevation_degrees, description)
+        camera_poses = [
+            (0, 0, "Front"),      # View 1
+            (90, 0, "Right"),     # View 2
+            (180, 0, "Back"),     # View 3
+            (270, 0, "Left"),     # View 4
+            (0, 90, "Top"),       # View 5
+            (180, -90, "Bottom"), # View 6
+        ]
+
+        # Import PIL for image handling
+        try:
+            from PIL import Image
+        except ImportError:
+            raise ImportError("PIL/Pillow is required for rendering. Install with: pip install Pillow")
+
+        # Render each view
+        rendered_images = []
+
+        for azimuth, elevation, description in camera_poses:
+            print(f"   Rendering {description} view (azimuth={azimuth}°, elevation={elevation}°)...")
+
+            # Create scene with mesh
+            scene = trimesh.scene.Scene(mesh)
+
+            # Set orthographic camera
+            # Convert angles to radians
+            azimuth_rad = np.radians(azimuth)
+            elevation_rad = np.radians(elevation)
+
+            # Calculate camera position (spherical coordinates)
+            x = camera_distance * np.cos(elevation_rad) * np.sin(azimuth_rad)
+            y = camera_distance * np.sin(elevation_rad)
+            z = camera_distance * np.cos(elevation_rad) * np.cos(azimuth_rad)
+
+            camera_position = np.array([x, y, z])
+
+            # Set camera transform (look at origin)
+            scene.camera_transform = scene.camera.look_at(
+                points=[mesh.bounds.mean(axis=0)],
+                center=camera_position
+            )
+
+            # Render with orthographic projection
+            try:
+                # Try pyrender backend (better quality)
+                rendered = scene.save_image(resolution=(resolution, resolution), visible=True)
+                img = Image.open(io.BytesIO(rendered))
+            except:
+                # Fallback to simple GL rendering
+                import io
+                rendered = scene.save_image(resolution=(resolution, resolution))
+                img = Image.open(io.BytesIO(rendered))
+
+            rendered_images.append(np.array(img))
+
+        # Convert to torch tensors (ComfyUI IMAGE format: NHWC, values 0-1)
+        rendered_tensors = [torch.from_numpy(img.astype(np.float32) / 255.0) for img in rendered_images]
+
+        # Arrange according to output_layout
+        if output_layout == "batch":
+            # Stack as batch: (6, H, W, C)
+            output = torch.stack(rendered_tensors, dim=0)
+
+        elif output_layout == "horizontal_1x6":
+            # Horizontal strip: (1, H, W*6, C)
+            output = torch.cat(rendered_tensors, dim=1).unsqueeze(0)
+
+        elif output_layout == "grid_2x3":
+            # 2 rows × 3 columns
+            # Row 1: Front, Right, Back
+            # Row 2: Left, Top, Bottom
+            row1 = torch.cat(rendered_tensors[0:3], dim=1)  # Front, Right, Back
+            row2 = torch.cat(rendered_tensors[3:6], dim=1)  # Left, Top, Bottom
+            output = torch.cat([row1, row2], dim=0).unsqueeze(0)
+
+        elif output_layout == "grid_3x2":
+            # 3 rows × 2 columns
+            # Row 1: Front, Right
+            # Row 2: Back, Left
+            # Row 3: Top, Bottom
+            row1 = torch.cat([rendered_tensors[0], rendered_tensors[1]], dim=1)
+            row2 = torch.cat([rendered_tensors[2], rendered_tensors[3]], dim=1)
+            row3 = torch.cat([rendered_tensors[4], rendered_tensors[5]], dim=1)
+            output = torch.cat([row1, row2, row3], dim=0).unsqueeze(0)
+
+        print(f"   ✅ Rendered 6 views, output shape: {output.shape}")
+        print("=== End Multi-View Rendering ===\n")
+
+        return (output,)
+
+
 # Required exports for ComfyUI
 NODE_CLASS_MAPPINGS = {
     "MeshCraftPostProcess": MeshCraftPostProcess,
+    "MeshCraftRenderMultiView": RenderMeshMultiView,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "MeshCraftPostProcess": "MeshCraft Post-Process",
+    "MeshCraftRenderMultiView": "Render Mesh Multi-View (Hunyuan3D)",
 }

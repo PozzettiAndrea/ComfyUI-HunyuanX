@@ -19,10 +19,11 @@ from .interpolation_nodes import NODE_CLASS_MAPPINGS as INTERP_NODES, NODE_DISPL
 try:
     from .hunyuan_nodes import NODE_CLASS_MAPPINGS as HUNYUAN_NODES, NODE_DISPLAY_NAME_MAPPINGS as HUNYUAN_DISPLAY
     from .andrea_nodes import NODE_CLASS_MAPPINGS as ANDREA_NODES, NODE_DISPLAY_NAME_MAPPINGS as ANDREA_DISPLAY
+    from .rendering_nodes import NODE_CLASS_MAPPINGS as RENDERING_NODES, NODE_DISPLAY_NAME_MAPPINGS as RENDERING_DISPLAY
     # Merge all the mappings
-    NODE_CLASS_MAPPINGS = {**MESH_NODES, **INTERP_NODES, **HUNYUAN_NODES, **ANDREA_NODES}
-    NODE_DISPLAY_NAME_MAPPINGS = {**MESH_DISPLAY, **INTERP_DISPLAY, **HUNYUAN_DISPLAY, **ANDREA_DISPLAY}
-    print("✅ ComfyUI-MeshCraft: Loaded all nodes (mesh + interpolation + hunyuan + andrea modular)")
+    NODE_CLASS_MAPPINGS = {**MESH_NODES, **INTERP_NODES, **HUNYUAN_NODES, **ANDREA_NODES, **RENDERING_NODES}
+    NODE_DISPLAY_NAME_MAPPINGS = {**MESH_DISPLAY, **INTERP_DISPLAY, **HUNYUAN_DISPLAY, **ANDREA_DISPLAY, **RENDERING_DISPLAY}
+    print("✅ ComfyUI-MeshCraft: Loaded all nodes (mesh + interpolation + hunyuan + andrea + rendering modular)")
 except ImportError as e:
     print(f"⚠️  ComfyUI-MeshCraft: Could not load Hunyuan nodes. Install ComfyUI-Hunyuan3d-2-1 first.")
     print(f"   Error: {e}")
