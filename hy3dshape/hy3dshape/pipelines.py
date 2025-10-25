@@ -698,6 +698,7 @@ class Hunyuan3DDiTFlowMatchingPipeline(Hunyuan3DDiTPipeline):
         output_type: Optional[str] = "trimesh",
         enable_pbar=True,
         mask = None,
+        embedding = None,
         **kwargs,
     ) -> List[List[trimesh.Trimesh]]:
         callback = kwargs.pop("callback", None)
@@ -713,16 +714,20 @@ class Hunyuan3DDiTFlowMatchingPipeline(Hunyuan3DDiTPipeline):
         )
 
         # print('image', type(image), 'mask', type(mask))
-        cond_inputs = self.prepare_image(image, mask)
-        image = cond_inputs.pop('image')
-        cond = self.encode_cond(
-            image=image,
-            additional_cond_inputs=cond_inputs,
-            do_classifier_free_guidance=do_classifier_free_guidance,
-            dual_guidance=False,
-        )
-
-        batch_size = image.shape[0]
+        # If embedding provided, use it directly; otherwise encode image
+        if embedding is not None:
+            cond = embedding
+            batch_size = 1  # Assume batch size 1 for embeddings
+        else:
+            cond_inputs = self.prepare_image(image, mask)
+            image = cond_inputs.pop('image')
+            cond = self.encode_cond(
+                image=image,
+                additional_cond_inputs=cond_inputs,
+                do_classifier_free_guidance=do_classifier_free_guidance,
+                dual_guidance=False,
+            )
+            batch_size = image.shape[0]
 
         # 5. Prepare timesteps
         # NOTE: this is slightly different from common usage, we start from 0.

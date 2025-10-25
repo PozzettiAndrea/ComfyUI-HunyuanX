@@ -329,12 +329,12 @@ class Hy3DMeshGenerator:
         return {
             "required": {
                 "model": (folder_paths.get_filename_list("diffusion_models"),),
-                "image": ("IMAGE",),
+                "processed_image": ("IMAGE",),
                 "steps": ("INT", {"default": 50, "min": 1, "max": 100}),
                 "guidance_scale": ("FLOAT", {"default": 5.0, "min": 1, "max": 30}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 "attention_mode": (["sdpa", "sageattn"], {"default": "sdpa"}),
-                "use_cache": ("BOOLEAN", {"default": True}),  # ✅ Keep the toggle
+                "use_cache": ("BOOLEAN", {"default": True}),
             },
         }
 

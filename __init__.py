@@ -17,9 +17,11 @@ from .nodes import NODE_CLASS_MAPPINGS as MESH_NODES, NODE_DISPLAY_NAME_MAPPINGS
 
 try:
     from .hunyuan_nodes import NODE_CLASS_MAPPINGS as HUNYUAN_NODES, NODE_DISPLAY_NAME_MAPPINGS as HUNYUAN_DISPLAY
-    # Merge the mappings
-    NODE_CLASS_MAPPINGS = {**MESH_NODES, **HUNYUAN_NODES}
-    NODE_DISPLAY_NAME_MAPPINGS = {**MESH_DISPLAY, **HUNYUAN_DISPLAY}
+    from .andrea_nodes import NODE_CLASS_MAPPINGS as ANDREA_NODES, NODE_DISPLAY_NAME_MAPPINGS as ANDREA_DISPLAY
+    # Merge all the mappings
+    NODE_CLASS_MAPPINGS = {**MESH_NODES, **HUNYUAN_NODES, **ANDREA_NODES}
+    NODE_DISPLAY_NAME_MAPPINGS = {**MESH_DISPLAY, **HUNYUAN_DISPLAY, **ANDREA_DISPLAY}
+    print("✅ ComfyUI-MeshCraft: Loaded all nodes (mesh + hunyuan + andrea modular)")
 except ImportError as e:
     print(f"⚠️  ComfyUI-MeshCraft: Could not load Hunyuan nodes. Install ComfyUI-Hunyuan3d-2-1 first.")
     print(f"   Error: {e}")

@@ -75,7 +75,7 @@ scheduler:
 image_processor:
   target: .hy3dshape.hy3dshape.preprocessors.ImageProcessorV2
   params:
-    size: 512
+    size: 518
     border_ratio: 0.15
 
 pipeline:
