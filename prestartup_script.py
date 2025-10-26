@@ -13,6 +13,104 @@ import sys
 import subprocess
 import site
 
+def check_cuda_libraries():
+    """
+    Check if required CUDA development libraries are installed.
+
+    Returns:
+        tuple: (bool, list) - (all_available, missing_headers)
+    """
+    # Check for key header files that custom_rasterizer needs
+    cuda_home = os.environ.get('CUDA_HOME', '/usr/local/cuda-12.8')
+    required_headers = [
+        'cusparse.h',      # CUDA sparse matrix library
+        'cublas_v2.h',     # CUDA basic linear algebra
+        'cufft.h',         # CUDA FFT library
+    ]
+
+    include_dir = os.path.join(cuda_home, 'include')
+    if not os.path.exists(include_dir):
+        return False, ['CUDA not found at ' + cuda_home]
+
+    missing = []
+    for header in required_headers:
+        header_path = os.path.join(include_dir, header)
+        if not os.path.exists(header_path):
+            missing.append(header)
+
+    return len(missing) == 0, missing
+
+
+def install_cuda_libraries():
+    """
+    Automatically install missing CUDA development libraries.
+
+    Returns:
+        bool: True if installation succeeded, False otherwise
+    """
+    print("\n" + "="*80)
+    print("📦 ComfyUI-MeshCraft: Installing CUDA development libraries...")
+    print("   Package: cuda-libraries-dev-12-8 (~100MB)")
+    print("   This is needed for custom rasterizer compilation")
+    print("="*80 + "\n")
+
+    import shutil
+
+    # Check if running as root or if sudo is available
+    try:
+        is_root = os.geteuid() == 0
+    except AttributeError:
+        # Windows doesn't have geteuid
+        print("⚠️  Auto-installation only supported on Linux")
+        return False
+
+    if not is_root and not shutil.which("sudo"):
+        print("⚠️  sudo not available, cannot auto-install")
+        print("   Please install manually: sudo apt-get install cuda-libraries-dev-12-8")
+        return False
+
+    cmd_prefix = [] if is_root else ["sudo", "-n"]  # -n = non-interactive
+
+    try:
+        # Update package list first
+        print("   Updating package list...")
+        update_result = subprocess.run(
+            cmd_prefix + ["apt-get", "update", "-qq"],
+            capture_output=True,
+            timeout=120,
+            text=True
+        )
+
+        # Install cuda-libraries-dev-12-8
+        print("   Installing CUDA libraries (this may take 1-2 minutes)...")
+        result = subprocess.run(
+            cmd_prefix + ["apt-get", "install", "-y", "cuda-libraries-dev-12-8"],
+            capture_output=True,
+            timeout=300,
+            text=True
+        )
+
+        if result.returncode == 0:
+            print("\n" + "="*80)
+            print("✅ ComfyUI-MeshCraft: CUDA libraries installed successfully!")
+            print("="*80 + "\n")
+            return True
+        else:
+            print("\n" + "="*80)
+            print("⚠️  ComfyUI-MeshCraft: Installation failed")
+            print("   You can install manually:")
+            print("   sudo apt-get install cuda-libraries-dev-12-8")
+            print("="*80 + "\n")
+            return False
+
+    except subprocess.TimeoutExpired:
+        print("⚠️  Installation timed out")
+        return False
+    except Exception as e:
+        print(f"⚠️  Installation error: {e}")
+        return False
+
+
 def compile_cuda_extension():
     """Compile the custom rasterizer CUDA extension if not already compiled."""
 
@@ -37,6 +135,26 @@ def compile_cuda_extension():
             if os.path.exists(ext_path):
                 print("✅ ComfyUI-MeshCraft: custom_rasterizer already compiled")
                 return True
+
+    # Check if CUDA libraries are available before attempting compilation
+    libs_available, missing = check_cuda_libraries()
+    if not libs_available:
+        print("\n" + "="*80)
+        print("⚠️  ComfyUI-MeshCraft: Missing CUDA development libraries")
+        print(f"   Missing: {', '.join(missing)}")
+        print("="*80 + "\n")
+
+        # Try to install automatically
+        if install_cuda_libraries():
+            print("✅ CUDA libraries installed, proceeding with compilation...")
+        else:
+            print("\n" + "="*80)
+            print("⚠️  ComfyUI-MeshCraft: Skipping custom rasterizer compilation")
+            print("   Basic 3D mesh generation will still work")
+            print("   For advanced texture features, install manually:")
+            print("   sudo apt-get install cuda-libraries-dev-12-8")
+            print("="*80 + "\n")
+            return False
 
     print("\n" + "="*80)
     print("🔧 ComfyUI-MeshCraft: Compiling CUDA extension...")
