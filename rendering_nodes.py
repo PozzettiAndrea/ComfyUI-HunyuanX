@@ -97,6 +97,10 @@ class LoadHunyuanMultiViewModel:
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "model_repo": ("STRING", {
+                    "default": "tencent/Hunyuan3D-2.1",
+                    "tooltip": "HuggingFace repository ID for the PaintPBR model"
+                }),
                 "device": (["cuda", "cpu"], {"default": "cuda"}),
             },
         }
@@ -106,21 +110,32 @@ class LoadHunyuanMultiViewModel:
     FUNCTION = "load_model"
     CATEGORY = "MeshCraft/Rendering"
 
-    def load_model(self, device):
+    def load_model(self, model_repo="tencent/Hunyuan3D-2.1", device="cuda"):
         """
         Load Hunyuan3D multiview diffusion model.
 
         Args:
+            model_repo: HuggingFace repository ID (e.g., "tencent/Hunyuan3D-2.1")
             device: Device to load model on ("cuda" or "cpu")
 
         Returns:
             Tuple containing cached model instance
         """
+        # Debug: Check what we actually received
         print(f"\n🎨 Loading Hunyuan3D Multiview Model...")
+        print(f"   DEBUG: model_repo type={type(model_repo)}, value={repr(model_repo)}")
+        print(f"   DEBUG: device type={type(device)}, value={repr(device)}")
+
+        # Validate inputs - catch if arguments are swapped
+        if model_repo in ["cuda", "cpu"]:
+            print(f"   ⚠️  WARNING: model_repo looks like a device! Swapping parameters...")
+            model_repo, device = device, model_repo
+
+        print(f"   Model: {model_repo}")
         print(f"   Device: {device}")
 
-        # Check cache
-        config_hash = device
+        # Check cache (include model_repo in hash)
+        config_hash = f"{model_repo}_{device}"
         if (LoadHunyuanMultiViewModel._cached_model is not None and
             LoadHunyuanMultiViewModel._cached_config_hash == config_hash):
             print("   ⚡ Using cached model (fast!)")
@@ -142,6 +157,7 @@ class LoadHunyuanMultiViewModel:
             texture_size=1024
         )
         config.device = device
+        config.multiview_pretrained_path = model_repo  # Use custom model repo
 
         # Load model
         model = multiviewDiffusionNet(config)
@@ -283,7 +299,234 @@ class RenderConditioningMaps:
 
 
 # =============================================================================
-# Node 3: Generate Multiview PBR
+# Node 3: Render RGB Multiview Images (Blender-based)
+# =============================================================================
+
+class RenderRGBMultiview:
+    """
+    Render RGB images of mesh using Blender (matching Hunyuan3D-2.1 training pipeline).
+
+    This uses Blender's Cycles/Eevee renderer to create high-quality multiview RGB images,
+    exactly as described in Hunyuan3D-2.1 data preprocessing documentation.
+
+    Based on the rendering pipeline from TRELLIS and Objaverse datasets.
+
+    Uses:
+    - Creating reference images matching Hunyuan3D training data
+    - Generating synthetic training datasets
+    - High-quality mesh visualization from multiple angles
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "mesh": ("TRIMESH",),
+                "camera_config": ("HY3D21CAMERA",),
+                "resolution": ("INT", {
+                    "default": 518,
+                    "min": 64,
+                    "max": 2048,
+                    "step": 1,
+                    "tooltip": "Render resolution for each view (518 matches Hunyuan3D training)"
+                }),
+                "background_color": (["white", "transparent"], {
+                    "default": "white",
+                    "tooltip": "Background color for rendered images"
+                }),
+                "engine": (["CYCLES", "BLENDER_EEVEE"], {
+                    "default": "CYCLES",
+                    "tooltip": "Rendering engine (Cycles=high quality, Eevee=fast)"
+                }),
+                "samples": ("INT", {
+                    "default": 64,
+                    "min": 1,
+                    "max": 512,
+                    "step": 1,
+                    "tooltip": "Number of samples for Cycles (more=better quality, slower)"
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("rgb_images",)
+    FUNCTION = "render"
+    CATEGORY = "MeshCraft/Rendering"
+
+    def render(self, mesh, camera_config, resolution, background_color, engine, samples):
+        """
+        Render RGB images using Blender (matching Hunyuan3D-2.1 training pipeline).
+
+        Args:
+            mesh: Input trimesh object
+            camera_config: Camera configuration with azimuths/elevations
+            resolution: Render resolution per view
+            background_color: Background color ("white" or "transparent")
+            engine: Rendering engine ("CYCLES" or "BLENDER_EEVEE")
+            samples: Number of samples for Cycles rendering
+
+        Returns:
+            Tuple containing rendered RGB images as IMAGE batch
+        """
+        print(f"\n🎨 Rendering RGB Multiview Images (Blender)...")
+        print(f"   Resolution: {resolution}x{resolution}")
+        print(f"   Background: {background_color}")
+        print(f"   Engine: {engine}")
+        print(f"   Samples: {samples}")
+
+        import subprocess
+        import tempfile
+        import json
+        from pathlib import Path
+        import numpy as np
+        from PIL import Image
+
+        torch = _lazy_import("torch")
+
+        # Extract camera parameters
+        azimuths = camera_config["selected_camera_azims"]
+        elevations = camera_config["selected_camera_elevs"]
+        num_views = len(azimuths)
+        ortho_scale = camera_config.get("ortho_scale", 1.0)
+
+        print(f"   Rendering {num_views} views...")
+
+        # Create temporary directory for files
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            # Save mesh to temporary file
+            mesh_path = tmpdir / "mesh.obj"
+            mesh.export(str(mesh_path))
+
+            # Create camera config file
+            camera_data = {
+                "azimuths": azimuths,
+                "elevations": elevations,
+                "ortho_scale": ortho_scale,
+                "resolution": resolution,
+                "background": background_color,
+                "engine": engine,
+                "samples": samples,
+                "output_dir": str(tmpdir)
+            }
+            config_path = tmpdir / "render_config.json"
+            with open(config_path, 'w') as f:
+                json.dump(camera_data, f)
+
+            # Use external Blender rendering script
+            import os as os_module
+            script_path = os_module.path.join(
+                os_module.path.dirname(os_module.path.abspath(__file__)),
+                "blender_render_script.py"
+            )
+
+            # Find Blender executable
+            blender_path = self._find_blender()
+
+            if blender_path is None:
+                raise RuntimeError(
+                    "Blender not found! Please install Blender 3.0+ or set BLENDER_PATH environment variable.\n"
+                    "Download from: https://www.blender.org/download/"
+                )
+
+            # Run Blender in background mode
+            print(f"   Running Blender: {blender_path}")
+            cmd = [
+                blender_path,
+                "--background",
+                "--python", str(script_path),
+                "--",
+                str(mesh_path),
+                str(config_path)
+            ]
+
+            try:
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=300  # 5 minute timeout
+                )
+
+                # Always show output for debugging
+                if result.stdout:
+                    print(f"   Blender stdout:\n{result.stdout}")
+                if result.stderr:
+                    print(f"   Blender stderr:\n{result.stderr}")
+
+                if result.returncode != 0:
+                    raise RuntimeError(f"Blender rendering failed with code {result.returncode}")
+
+            except subprocess.TimeoutExpired:
+                raise RuntimeError("Blender rendering timed out after 5 minutes")
+
+            # Load rendered images
+            rendered_images = []
+            for i in range(num_views):
+                img_path = tmpdir / f"render_{i:03d}.png"
+                if not img_path.exists():
+                    print(f"   ⚠️  Missing render {i}, creating blank")
+                    blank = np.ones((resolution, resolution, 3), dtype=np.uint8) * 255
+                    rendered_images.append(blank)
+                else:
+                    img = Image.open(img_path)
+
+                    # Convert to RGB if needed
+                    if img.mode == 'RGBA' and background_color == "white":
+                        # Composite over white background
+                        bg = Image.new('RGB', img.size, (255, 255, 255))
+                        bg.paste(img, mask=img.split()[3])
+                        img = bg
+                    else:
+                        img = img.convert('RGB')
+
+                    rendered_images.append(np.array(img))
+
+        # Convert to ComfyUI IMAGE format (NHWC, float32, 0-1)
+        rendered_tensors = [torch.from_numpy(img.astype(np.float32) / 255.0) for img in rendered_images]
+        output = torch.stack(rendered_tensors, dim=0)
+
+        print(f"   ✅ Rendered {num_views} RGB views")
+        print(f"   Output shape: {output.shape}")
+        print("=== End RGB Multiview Rendering ===\n")
+
+        return (output,)
+
+    def _find_blender(self):
+        """Find Blender executable."""
+        import os
+        import shutil
+
+        # Check environment variable first
+        blender_path = os.environ.get("BLENDER_PATH")
+        if blender_path and os.path.exists(blender_path):
+            return blender_path
+
+        # Check common locations
+        common_paths = [
+            "/usr/bin/blender",
+            "/usr/local/bin/blender",
+            "/Applications/Blender.app/Contents/MacOS/Blender",
+            "C:\\Program Files\\Blender Foundation\\Blender 4.1\\blender.exe",
+            "C:\\Program Files\\Blender Foundation\\Blender 4.0\\blender.exe",
+            "C:\\Program Files\\Blender Foundation\\Blender 3.6\\blender.exe",
+        ]
+
+        for path in common_paths:
+            if os.path.exists(path):
+                return path
+
+        # Try to find in PATH
+        blender_path = shutil.which("blender")
+        if blender_path:
+            return blender_path
+
+        return None
+
+
+# =============================================================================
+# Node 4: Generate Multiview PBR
 # =============================================================================
 
 class GenerateMultiviewPBR:
@@ -423,11 +666,13 @@ class GenerateMultiviewPBR:
 NODE_CLASS_MAPPINGS = {
     "MeshCraft_LoadHunyuanMultiViewModel": LoadHunyuanMultiViewModel,
     "MeshCraft_RenderConditioningMaps": RenderConditioningMaps,
+    "MeshCraft_RenderRGBMultiview": RenderRGBMultiview,
     "MeshCraft_GenerateMultiviewPBR": GenerateMultiviewPBR,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "MeshCraft_LoadHunyuanMultiViewModel": "Load Hunyuan Multiview Model",
     "MeshCraft_RenderConditioningMaps": "Render Conditioning Maps (Normals + Positions)",
+    "MeshCraft_RenderRGBMultiview": "Render RGB Multiview Images",
     "MeshCraft_GenerateMultiviewPBR": "Generate Multiview PBR Textures",
 }

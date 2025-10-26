@@ -1,5 +1,4 @@
 trimesh
-pyglet
 pymeshlab
 pygltflib
 xatlas

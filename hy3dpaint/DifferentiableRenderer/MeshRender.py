@@ -720,7 +720,8 @@ class MeshRender:
             self.mesh_normalize_scale_factor = 1.0
             self.mesh_normalize_scale_center = np.array([[0, 0, 0]])
 
-        if uv_idx is not None:
+        # Only extract texture-space maps if mesh has valid UV coordinates
+        if self.vtx_uv is not None and self.uv_idx is not None:
             self.extract_textiles()
 
     def _set_texture_unified(self, tex: Union[np.ndarray, torch.Tensor, Image.Image], 

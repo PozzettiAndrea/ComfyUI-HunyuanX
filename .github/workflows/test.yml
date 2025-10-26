@@ -49,6 +49,12 @@ jobs:
         cd ComfyUI/custom_nodes/ComfyUI-MeshCraft
         pip install -r requirements.txt
 
+    - name: Compile CUDA extension
+      working-directory: ComfyUI/custom_nodes/ComfyUI-MeshCraft/hy3dpaint/custom_rasterizer
+      run: |
+        echo "🔧 Compiling custom_rasterizer CUDA extension..."
+        python setup.py install || echo "⚠️  CUDA extension compilation skipped (no GPU in CI)"
+
     - name: Install test dependencies
       run: |
         pip install pytest pytest-cov pytest-mock

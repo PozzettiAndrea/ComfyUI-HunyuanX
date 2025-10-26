@@ -255,12 +255,17 @@ class RenderMeshMultiView:
             )
 
             # Render with orthographic projection
+            # Use OSMesa for headless rendering (no display required)
+            import os
+            os.environ['PYOPENGL_PLATFORM'] = 'osmesa'
+
             try:
                 # Try pyrender backend (better quality)
-                rendered = scene.save_image(resolution=(resolution, resolution), visible=True)
+                rendered = scene.save_image(resolution=(resolution, resolution), visible=False)
                 img = Image.open(io.BytesIO(rendered))
-            except:
+            except Exception as e:
                 # Fallback to simple GL rendering
+                print(f"Render attempt 1 failed: {e}, trying fallback...")
                 import io
                 rendered = scene.save_image(resolution=(resolution, resolution))
                 img = Image.open(io.BytesIO(rendered))
@@ -306,10 +311,10 @@ class RenderMeshMultiView:
 # Required exports for ComfyUI
 NODE_CLASS_MAPPINGS = {
     "MeshCraftPostProcess": MeshCraftPostProcess,
-    "MeshCraftRenderMultiView": RenderMeshMultiView,
+    # "MeshCraftRenderMultiView": RenderMeshMultiView,  # REMOVED - use MeshCraft_RenderConditioningMaps instead (no pyglet dependency)
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "MeshCraftPostProcess": "MeshCraft Post-Process",
-    "MeshCraftRenderMultiView": "Render Mesh Multi-View (Hunyuan3D)",
+    # "MeshCraftRenderMultiView": "Render Mesh Multi-View (Hunyuan3D)",  # REMOVED
 }
