@@ -10,6 +10,7 @@ transformers
 diffusers
 accelerate
 pytorch-lightning
+torchvision
 opencv-python
 huggingface-hub
 safetensors

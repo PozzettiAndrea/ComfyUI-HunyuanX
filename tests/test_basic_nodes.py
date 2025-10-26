@@ -71,42 +71,6 @@ class TestMeshPostprocessing:
         assert np.all(uvs <= 1.0)
 
 
-class TestImageProcessing:
-    """Tests for image processing nodes."""
-
-    def test_resize_images_changes_dimensions(self, sample_image_tensor):
-        """Test that image resizing changes dimensions correctly."""
-        from hunyuan_nodes import Hy3D21ResizeImages
-
-        node = Hy3D21ResizeImages()
-
-        # Original is 512x512
-        assert sample_image_tensor.shape == (1, 512, 512, 3)
-
-        # Resize to 256x256
-        result = node.process(sample_image_tensor, 256, 256)
-        resized = result[0]
-
-        assert resized.shape == (1, 256, 256, 3)
-
-    def test_resize_preserves_batch_and_channels(self, sample_image_tensor):
-        """Test that resizing preserves batch size and channel count."""
-        from hunyuan_nodes import Hy3D21ResizeImages
-
-        node = Hy3D21ResizeImages()
-
-        # Create a batch of 3 images
-        batch_tensor = torch.cat([sample_image_tensor] * 3, dim=0)
-        assert batch_tensor.shape == (3, 512, 512, 3)
-
-        result = node.process(batch_tensor, 256, 256)
-        resized = result[0]
-
-        # Should preserve batch size and channels
-        assert resized.shape[0] == 3  # Batch size
-        assert resized.shape[3] == 3  # Channels
-        assert resized.shape[1:3] == (256, 256)  # New dimensions
-
 
 class TestCameraConfiguration:
     """Tests for camera configuration nodes."""
@@ -158,18 +122,6 @@ class TestInputValidation:
     """Tests for input validation and error handling."""
 
     # Negative target faces test removed - decimation nodes were removed from codebase
-
-    def test_zero_resolution_rejected(self, sample_image_tensor):
-        """Test that zero or negative resolution is rejected."""
-        from hunyuan_nodes import Hy3D21ResizeImages
-
-        node = Hy3D21ResizeImages()
-
-        with pytest.raises((ValueError, AssertionError)):
-            node.process(sample_image_tensor, 0, 512)
-
-        with pytest.raises((ValueError, AssertionError)):
-            node.process(sample_image_tensor, 512, -1)
 
 
 # Mark tests that require heavy imports as slow

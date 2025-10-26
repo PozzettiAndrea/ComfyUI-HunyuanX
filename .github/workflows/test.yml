@@ -68,20 +68,10 @@ jobs:
         pytest custom_nodes/ComfyUI-MeshCraft/tests/ -v --tb=short
 
     - name: Test node imports
-      working-directory: ComfyUI
+      working-directory: ComfyUI/custom_nodes/ComfyUI-MeshCraft
       run: |
-        export PYTHONPATH=$PWD:$PYTHONPATH
-        cd custom_nodes/ComfyUI-MeshCraft
-        python -c "
-import sys
-sys.path.insert(0, '../..')
-try:
-    from custom_nodes.ComfyUI_MeshCraft import NODE_CLASS_MAPPINGS
-    print(f'✅ Successfully imported {len(NODE_CLASS_MAPPINGS)} nodes')
-except Exception as e:
-    print(f'⚠️  Import failed: {e}')
-    print('This is expected if dependencies are missing')
-"
+        export PYTHONPATH=$PWD/../..:$PYTHONPATH
+        python -c "import sys; sys.path.insert(0, '../..'); exec(open('__init__.py').read()); print(f'✅ Loaded {len(NODE_CLASS_MAPPINGS)} nodes')"
 
   lint:
     runs-on: ubuntu-latest

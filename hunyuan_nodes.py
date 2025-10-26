@@ -749,63 +749,6 @@ class Hy3D21VAEDecode:
 
         return (mesh_output, )        
         
-class Hy3D21ResizeImages:
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "images": ("IMAGE",),
-                "width": ("INT", {"default":1024, "min":16, "max":8192} ),
-                "height": ("INT", {"default":1024, "min":16, "max":8192} ),
-                "sampling": (["NEAREST","LANCZOS","BILINEAR","BICUBIC","BOX","HAMMING"], {"default":"BICUBIC"})
-            },          
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("images",)
-    FUNCTION = "process"
-    CATEGORY = "Hunyuan3D21Wrapper"
-
-    def process(self, images, width, height, sampling):
-        torch = _lazy_import("torch")
-        _lazy_import("PIL.Image")
-        Image = _LAZY_IMPORTS["PIL.Image"]
-
-        if sampling=='NEAREST':
-            resampling = Image.Resampling.NEAREST
-        elif sampling=='LANCZOS':
-            resampling = Image.Resampling.LANCZOS
-        elif sampling=='BILINEAR':
-            resampling = Image.Resampling.BILINEAR
-        elif sampling=='BICUBIC':
-            resampling = Image.Resampling.BICUBIC
-        elif sampling=='BOX':
-            resampling = Image.Resampling.BOX
-        elif sampling=='HAMMING':
-            resampling = Image.Resampling.HAMMING
-        else:
-            raise Exception('Unknown sampling')
-
-        if isinstance(images, List):
-            for i in range(len(images)):
-                if isinstance(images[i], torch.Tensor):
-                    images[i] = tensor2pil(images[i])
-                images[i] = images[i].resize((width,height), resampling)
-                images[i] = pil2tensor(images[i])
-        elif isinstance(images, torch.Tensor):
-            pil_images = convert_tensor_images_to_pil(images)
-            for index, img in enumerate(pil_images):
-                img = img.resize((width,height), resampling)
-                pil_images[index] = img
-            tensors = hy3dpaintimages_to_tensor(pil_images)
-            return (tensors,)            
-        elif isinstance(images, Image):
-            images = images.resize((width,height), resampling)
-            images = pil2tensor(images)
-        else:
-            raise Exception("Unsupported images format")                     
-        
-        return (images, )
         
 class Hy3D21LoadImageWithTransparency:
     @classmethod
@@ -1095,7 +1038,6 @@ NODE_CLASS_MAPPINGS = {
     "Hy3D21CameraConfig": Hy3D21CameraConfig,
     "Hy3D21VAELoader": Hy3D21VAELoader,
     "Hy3D21VAEDecode": Hy3D21VAEDecode,
-    "Hy3D21ResizeImages": Hy3D21ResizeImages,
     "Hy3D21LoadImageWithTransparency": Hy3D21LoadImageWithTransparency,
     "Hy3D21PostprocessMesh": Hy3D21PostprocessMesh,
     "Hy3D21ExportMesh": Hy3D21ExportMesh,
@@ -1112,7 +1054,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "Hy3D21CameraConfig": "Hunyuan 3D 2.1 Camera Config",
     "Hy3D21VAELoader": "Hunyuan 3D 2.1 VAE Loader",
     "Hy3D21VAEDecode": "Hunyuan 3D 2.1 VAE Decoder",
-    "Hy3D21ResizeImages": "Hunyuan 3D 2.1 Resize Images",
     "Hy3D21LoadImageWithTransparency": "Hunyuan 3D 2.1 Load Image with Transparency",
     "Hy3D21PostprocessMesh": "Hunyuan 3D 2.1 Post Process Trimesh",
     "Hy3D21ExportMesh": "Hunyuan 3D 2.1 Export Mesh",
