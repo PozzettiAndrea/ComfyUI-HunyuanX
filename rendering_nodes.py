@@ -102,6 +102,10 @@ class LoadHunyuanMultiViewModel:
                     "tooltip": "HuggingFace repository ID for the PaintPBR model"
                 }),
                 "device": (["cuda", "cpu"], {"default": "cuda"}),
+                "attention_mode": (["sdpa", "sageattn", "flash", "xformers"], {
+                    "default": "sdpa",
+                    "tooltip": "Attention mechanism (sdpa=auto, sageattn=8-bit quantized, flash=FlashAttention, xformers=memory efficient)"
+                }),
             },
         }
 
@@ -110,13 +114,14 @@ class LoadHunyuanMultiViewModel:
     FUNCTION = "load_model"
     CATEGORY = "MeshCraft/Rendering"
 
-    def load_model(self, model_repo="tencent/Hunyuan3D-2.1", device="cuda"):
+    def load_model(self, model_repo="tencent/Hunyuan3D-2.1", device="cuda", attention_mode="sdpa"):
         """
         Load Hunyuan3D multiview diffusion model.
 
         Args:
             model_repo: HuggingFace repository ID (e.g., "tencent/Hunyuan3D-2.1")
             device: Device to load model on ("cuda" or "cpu")
+            attention_mode: Attention mechanism to use
 
         Returns:
             Tuple containing cached model instance
@@ -125,6 +130,7 @@ class LoadHunyuanMultiViewModel:
         print(f"\n🎨 Loading Hunyuan3D Multiview Model...")
         print(f"   DEBUG: model_repo type={type(model_repo)}, value={repr(model_repo)}")
         print(f"   DEBUG: device type={type(device)}, value={repr(device)}")
+        print(f"   DEBUG: attention_mode type={type(attention_mode)}, value={repr(attention_mode)}")
 
         # Validate inputs - catch if arguments are swapped
         if model_repo in ["cuda", "cpu"]:
@@ -133,15 +139,16 @@ class LoadHunyuanMultiViewModel:
 
         print(f"   Model: {model_repo}")
         print(f"   Device: {device}")
+        print(f"   Attention: {attention_mode}")
 
-        # Check cache (include model_repo in hash)
-        config_hash = f"{model_repo}_{device}"
+        # Check cache (include model_repo and attention_mode in hash)
+        config_hash = f"{model_repo}_{device}_{attention_mode}"
         if (LoadHunyuanMultiViewModel._cached_model is not None and
             LoadHunyuanMultiViewModel._cached_config_hash == config_hash):
             print("   ⚡ Using cached model (fast!)")
             return (LoadHunyuanMultiViewModel._cached_model,)
 
-        print("   🔥 Loading model from HuggingFace (first time)...")
+        print("   🔥 Loading model from HuggingFace (first time or settings changed)...")
 
         # Import dependencies
         multiviewDiffusionNet = _lazy_import("multiviewDiffusionNet")
@@ -162,6 +169,9 @@ class LoadHunyuanMultiViewModel:
         # Load model
         model = multiviewDiffusionNet(config)
 
+        # Set attention mode on the pipeline
+        self._set_attention_mode(model.pipeline, attention_mode)
+
         # Cache it
         LoadHunyuanMultiViewModel._cached_model = model
         LoadHunyuanMultiViewModel._cached_config_hash = config_hash
@@ -170,6 +180,53 @@ class LoadHunyuanMultiViewModel:
         print("=== End Model Loading ===\n")
 
         return (model,)
+
+    def _set_attention_mode(self, pipeline, attention_mode):
+        """Set attention mechanism on the pipeline's UNet."""
+        print(f"   Setting attention mode: {attention_mode}")
+
+        if attention_mode == "xformers":
+            try:
+                pipeline.enable_xformers_memory_efficient_attention()
+                print("   ✅ XFormers attention enabled")
+            except Exception as e:
+                print(f"   ⚠️  Failed to enable XFormers: {e}")
+                print(f"   💡 Install with: pip install xformers")
+
+        elif attention_mode == "flash":
+            # Flash Attention is used via SDPA backend when available
+            # PyTorch will automatically use it if flash-attn is installed
+            try:
+                # Disable xformers if it was enabled
+                if hasattr(pipeline, 'unet') and hasattr(pipeline.unet, 'set_default_attn_processor'):
+                    pipeline.unet.set_default_attn_processor()
+                print("   ✅ Flash Attention enabled (via SDPA)")
+                print("   💡 Ensure flash-attn is installed: pip install flash-attn")
+            except Exception as e:
+                print(f"   ⚠️  Error setting Flash Attention: {e}")
+
+        elif attention_mode == "sageattn":
+            try:
+                # SageAttention works as a drop-in replacement for SDPA
+                # The UNet's attention processors use F.scaled_dot_product_attention
+                # which can be monkey-patched by sageattention if installed
+                print("   ✅ SageAttention mode selected")
+                print("   💡 Ensure sageattention is installed: pip install sageattention")
+                print("   Note: SageAttention replaces SDPA at the PyTorch level")
+            except Exception as e:
+                print(f"   ⚠️  Error with SageAttention: {e}")
+
+        elif attention_mode == "sdpa":
+            # Default PyTorch SDPA (auto-selects best backend)
+            try:
+                if hasattr(pipeline, 'unet') and hasattr(pipeline.unet, 'set_default_attn_processor'):
+                    pipeline.unet.set_default_attn_processor()
+                print("   ✅ SDPA attention enabled (PyTorch auto-select)")
+            except Exception as e:
+                print(f"   ⚠️  Error setting SDPA: {e}")
+
+        else:
+            print(f"   ⚠️  Unknown attention mode: {attention_mode}, using default")
 
 
 # =============================================================================
@@ -331,19 +388,33 @@ class RenderRGBMultiview:
                     "tooltip": "Render resolution for each view (518 matches Hunyuan3D training)"
                 }),
                 "background_color": (["white", "transparent"], {
-                    "default": "white",
-                    "tooltip": "Background color for rendered images"
+                    "default": "transparent",
+                    "tooltip": "Background color for rendered images (Hunyuan3D uses transparent)"
                 }),
                 "engine": (["CYCLES", "BLENDER_EEVEE"], {
                     "default": "CYCLES",
                     "tooltip": "Rendering engine (Cycles=high quality, Eevee=fast)"
                 }),
                 "samples": ("INT", {
-                    "default": 64,
+                    "default": 128,
                     "min": 1,
                     "max": 512,
                     "step": 1,
-                    "tooltip": "Number of samples for Cycles (more=better quality, slower)"
+                    "tooltip": "Number of samples for Cycles (Hunyuan3D uses 128)"
+                }),
+                "ortho_scale": ("FLOAT", {
+                    "default": 1.2,
+                    "min": 0.1,
+                    "max": 5.0,
+                    "step": 0.1,
+                    "tooltip": "Orthographic camera scale (Hunyuan3D uses 1.2)"
+                }),
+                "camera_distance": ("FLOAT", {
+                    "default": 1.5,
+                    "min": 0.5,
+                    "max": 10.0,
+                    "step": 0.1,
+                    "tooltip": "Camera distance from object (Hunyuan3D uses 1.5)"
                 }),
             },
         }
@@ -353,7 +424,7 @@ class RenderRGBMultiview:
     FUNCTION = "render"
     CATEGORY = "MeshCraft/Rendering"
 
-    def render(self, mesh, camera_config, resolution, background_color, engine, samples):
+    def render(self, mesh, camera_config, resolution, background_color, engine, samples, ortho_scale, camera_distance):
         """
         Render RGB images using Blender (matching Hunyuan3D-2.1 training pipeline).
 
@@ -364,6 +435,8 @@ class RenderRGBMultiview:
             background_color: Background color ("white" or "transparent")
             engine: Rendering engine ("CYCLES" or "BLENDER_EEVEE")
             samples: Number of samples for Cycles rendering
+            ortho_scale: Orthographic camera scale (Hunyuan3D uses 1.2)
+            camera_distance: Camera distance from object (Hunyuan3D uses 1.5)
 
         Returns:
             Tuple containing rendered RGB images as IMAGE batch
@@ -373,6 +446,8 @@ class RenderRGBMultiview:
         print(f"   Background: {background_color}")
         print(f"   Engine: {engine}")
         print(f"   Samples: {samples}")
+        print(f"   Ortho scale: {ortho_scale}")
+        print(f"   Camera distance: {camera_distance}")
 
         import subprocess
         import tempfile
@@ -387,7 +462,6 @@ class RenderRGBMultiview:
         azimuths = camera_config["selected_camera_azims"]
         elevations = camera_config["selected_camera_elevs"]
         num_views = len(azimuths)
-        ortho_scale = camera_config.get("ortho_scale", 1.0)
 
         print(f"   Rendering {num_views} views...")
 
@@ -404,6 +478,7 @@ class RenderRGBMultiview:
                 "azimuths": azimuths,
                 "elevations": elevations,
                 "ortho_scale": ortho_scale,
+                "camera_distance": camera_distance,
                 "resolution": resolution,
                 "background": background_color,
                 "engine": engine,

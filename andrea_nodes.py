@@ -619,7 +619,7 @@ class Hy3DImageToLatents:
                 "steps": ("INT", {"default": 50, "min": 1, "max": 200}),
                 "guidance_scale": ("FLOAT", {"default": 5.0, "min": 0.0, "max": 30.0}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
-                "attention_mode": (["sdpa", "sageattn"], {"default": "sdpa"}),
+                "attention_mode": (["sdpa", "sageattn", "flash", "xformers"], {"default": "sdpa"}),
                 "use_cache": ("BOOLEAN", {"default": True}),
             },
             "optional": {
@@ -737,7 +737,7 @@ class LoadHunyuanDiT:
         return {
             "required": {
                 "model": (all_models,),
-                "attention_mode": (["sdpa", "sageattn"], {"default": "sdpa"}),
+                "attention_mode": (["sdpa", "sageattn", "flash", "xformers"], {"default": "sdpa"}),
                 "use_cache": ("BOOLEAN", {"default": True}),
             }
         }

@@ -55,24 +55,43 @@ if len(obj.data.materials) == 0:
 else:
     obj.data.materials[0] = mat
 
-# Set up rendering
+# Set up rendering (matching Hunyuan3D-2.1 exactly)
 scene = bpy.context.scene
 scene.render.engine = config["engine"]
 scene.render.resolution_x = config["resolution"]
 scene.render.resolution_y = config["resolution"]
-scene.render.film_transparent = (config["background"] == "transparent")
+scene.render.resolution_percentage = 100
+scene.render.image_settings.file_format = 'PNG'
+scene.render.image_settings.color_mode = 'RGBA'
+scene.render.film_transparent = True  # Always transparent like Hunyuan3D
+
+# Set background color if white requested
+if config["background"] == "white":
+    scene.world = bpy.data.worlds.new("World")
+    scene.world.use_nodes = True
+    bg_node = scene.world.node_tree.nodes.get("Background")
+    if bg_node:
+        bg_node.inputs[0].default_value = (1.0, 1.0, 1.0, 1.0)
+        bg_node.inputs[1].default_value = 1.0
 
 print(f"Render engine: {config['engine']}, resolution: {config['resolution']}")
+print(f"Background: {config['background']}")
 
 if config["engine"] == "CYCLES":
+    # Match Hunyuan3D-2.1 Cycles settings exactly
+    scene.cycles.device = 'GPU'
     scene.cycles.samples = config["samples"]
+    scene.cycles.filter_type = 'BOX'
+    scene.cycles.filter_width = 1.0  # Hunyuan3D uses 1.0, not 0.01
+    scene.cycles.diffuse_bounces = 1
+    scene.cycles.glossy_bounces = 1
     scene.cycles.use_denoising = True
-    scene.cycles.device = 'GPU'  # Use GPU if available
+    print(f"Cycles: samples={config['samples']}, bounces=1, filter=BOX")
 
 # Create camera
 camera_data = bpy.data.cameras.new(name="Camera")
 camera_data.type = 'ORTHO'
-camera_data.ortho_scale = config["ortho_scale"] * 2.0
+camera_data.ortho_scale = config["ortho_scale"]  # Hunyuan3D uses 1.2
 camera = bpy.data.objects.new("Camera", camera_data)
 scene.collection.objects.link(camera)
 scene.camera = camera
@@ -102,7 +121,7 @@ for i, (azim, elev) in enumerate(zip(config["azimuths"], config["elevations"])):
     elev_rad = math.radians(elev)
 
     # Calculate camera position (spherical coordinates)
-    distance = 1.5
+    distance = config.get("camera_distance", 1.5)  # Hunyuan3D uses 1.5
     x = distance * math.cos(elev_rad) * math.sin(azim_rad)
     y = distance * math.sin(elev_rad)
     z = distance * math.cos(elev_rad) * math.cos(azim_rad)

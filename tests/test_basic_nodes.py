@@ -47,39 +47,7 @@ class TestMeshLoadAndExport:
 class TestMeshPostprocessing:
     """Tests for mesh post-processing operations."""
 
-    def test_mesh_decimation_reduces_face_count(self, sample_trimesh):
-        """Test that mesh decimation reduces the number of faces."""
-        from nodes import Hy3D21MeshlibDecimate
-
-        node = Hy3D21MeshlibDecimate()
-        original_face_count = len(sample_trimesh.faces)
-
-        # Decimate to 50% of faces
-        target_faces = original_face_count // 2
-        result = node.process(sample_trimesh, target_faces)
-
-        decimated_mesh = result[0]
-        new_face_count = len(decimated_mesh.faces)
-
-        # Should have reduced faces (might not be exact due to algorithm)
-        assert new_face_count < original_face_count
-        assert new_face_count <= target_faces * 1.1  # Allow 10% margin
-
-    def test_mesh_decimation_preserves_topology(self, sample_trimesh):
-        """Test that decimation preserves mesh topology (still watertight if started watertight)."""
-        from nodes import Hy3D21MeshlibDecimate
-
-        node = Hy3D21MeshlibDecimate()
-        original_is_watertight = sample_trimesh.is_watertight
-
-        target_faces = len(sample_trimesh.faces) // 2
-        result = node.process(sample_trimesh, target_faces)
-
-        decimated_mesh = result[0]
-
-        # If original was watertight, decimated should be too (box mesh is watertight)
-        if original_is_watertight:
-            assert decimated_mesh.is_watertight
+    # Decimation tests removed - decimation nodes were removed from codebase
 
     def test_uv_unwrap_adds_uv_coordinates(self, sample_trimesh):
         """Test that UV unwrapping adds UV coordinates to mesh."""
@@ -189,15 +157,7 @@ class TestCameraConfiguration:
 class TestInputValidation:
     """Tests for input validation and error handling."""
 
-    def test_negative_target_faces_rejected(self, sample_trimesh):
-        """Test that negative face count is handled appropriately."""
-        from nodes import Hy3D21MeshlibDecimate
-
-        node = Hy3D21MeshlibDecimate()
-
-        # Should either raise an error or clamp to valid value
-        with pytest.raises((ValueError, AssertionError)):
-            node.process(sample_trimesh, -100)
+    # Negative target faces test removed - decimation nodes were removed from codebase
 
     def test_zero_resolution_rejected(self, sample_image_tensor):
         """Test that zero or negative resolution is rejected."""
