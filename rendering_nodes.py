@@ -28,6 +28,9 @@ def _lazy_import(module_name):
         if module_name == "torch":
             import torch
             _LAZY_IMPORTS["torch"] = torch
+        elif module_name == "np":
+            import numpy as np
+            _LAZY_IMPORTS["np"] = np
         elif module_name == "trimesh":
             import trimesh as Trimesh
             _LAZY_IMPORTS["trimesh"] = Trimesh
@@ -164,16 +167,14 @@ class LoadHunyuanMultiViewModel:
             camera_elevs=[0],
             view_weights=[1.0],
             ortho_scale=1.0,
-            texture_size=1024
+            texture_size=1024,
+            attention_mode=attention_mode  # Pass attention mode to config
         )
         config.device = device
         config.multiview_pretrained_path = model_repo  # Use custom model repo
 
-        # Load model
+        # Load model (attention mode is set during pipeline initialization)
         model = multiviewDiffusionNet(config)
-
-        # Set attention mode on the pipeline
-        self._set_attention_mode(model.pipeline, attention_mode)
 
         # Cache it
         LoadHunyuanMultiViewModel._cached_model = model

@@ -226,6 +226,10 @@ class LoadDinoModel:
                     "default": "large",
                     "tooltip": "DINO v2 model size (Hunyuan3D 2.1 uses Large)"
                 }),
+                "keep_in_memory": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "Keep model in VRAM between runs (recommended for faster execution)"
+                }),
             }
         }
 
@@ -234,7 +238,7 @@ class LoadDinoModel:
     FUNCTION = "load"
     CATEGORY = "Hunyuan3D21/Models"
 
-    def load(self, model_size):
+    def load(self, model_size, keep_in_memory=True):
         torch = _lazy_import("torch")
 
         device = mm.get_torch_device()
@@ -248,6 +252,13 @@ class LoadDinoModel:
         }
 
         model_id = model_map[model_size]
+
+        # Clear cache if keep_in_memory is False
+        if not keep_in_memory and self.conditioner is not None:
+            print(f"🗑️ Clearing DINO model from cache")
+            del self.conditioner
+            self.conditioner = None
+            self.current_model_id = None
 
         # Check if already loaded
         if self.conditioner is not None and self.current_model_id == model_id:
@@ -294,6 +305,9 @@ class LoadDinoModel:
         self.conditioner.to(device)
         self.conditioner.eval()
         self.current_model_id = model_id
+
+        if keep_in_memory:
+            print(f"💾 DINO model cached in memory for faster reloads")
 
         return (self.conditioner,)
 
@@ -405,8 +419,8 @@ class Hy3DGenerateLatents:
     def generate(self, dit_model, dino_embedding, steps, guidance_scale, seed, sigmas_str=""):
         torch = _lazy_import("torch")
         import numpy as np
-        from tqdm import tqdm
         from diffusers.utils.torch_utils import randn_tensor
+        from comfy.utils import ProgressBar
 
         device = mm.get_torch_device()
         seed = seed % (2**32)
@@ -528,8 +542,9 @@ class Hy3DGenerateLatents:
 
         # Diffusion loop
         print(f"\nStarting diffusion loop...")
+        pbar = ProgressBar(num_inference_steps)
         with torch.no_grad():
-            for i, t in enumerate(tqdm(timesteps, desc="Generating latents")):
+            for i, t in enumerate(timesteps):
                 if i == 0:
                     print(f"\nStep {i}: t={t.item():.4f}")
 
@@ -583,6 +598,9 @@ class Hy3DGenerateLatents:
 
                 if i == 0:
                     print(f"  Updated latents: {latents.shape}")
+
+                # Update progress bar
+                pbar.update_absolute(i + 1, num_inference_steps)
 
         print(f"\nDiffusion complete!")
         print(f"Final latents: {latents.shape} {latents.dtype}")

@@ -47,7 +47,7 @@ def quick_convert_with_obj2gltf(obj_path: str, glb_path: str) -> bool:
     create_glb_with_pbr_materials(obj_path, textures, glb_path)
 
 class Hunyuan3DPaintConfig:
-    def __init__(self, resolution, camera_azims, camera_elevs, view_weights, ortho_scale, texture_size):
+    def __init__(self, resolution, camera_azims, camera_elevs, view_weights, ortho_scale, texture_size, attention_mode="sdpa"):
         self.device = "cuda"
 
         cfg_path = os.path.join(
@@ -59,6 +59,7 @@ class Hunyuan3DPaintConfig:
         self.multiview_pretrained_path = "tencent/Hunyuan3D-2.1"
         self.dino_ckpt_path = "facebook/dinov2-giant"
         self.realesrgan_ckpt_path = "ckpt/RealESRGAN_x4plus.pth"
+        self.attention_mode = attention_mode  # Flash attention support
 
         self.raster_mode = "cr"
         self.bake_mode = "back_sample"

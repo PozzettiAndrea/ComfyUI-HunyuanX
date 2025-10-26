@@ -35,16 +35,53 @@ class multiviewDiffusionNet:
         self.cfg = cfg
         self.mode = self.cfg.model.params.stable_diffusion_config.custom_pipeline[2:]
 
-        model_path = huggingface_hub.snapshot_download(
-            repo_id=config.multiview_pretrained_path,
-            allow_patterns=["hunyuan3d-paintpbr-v2-1/*"],
-        )
+        # Setup local cache directory inside custom node
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        node_root = os.path.dirname(os.path.dirname(script_dir))  # Go up 2 levels to ComfyUI-MeshCraft/
+        cache_dir = os.path.join(node_root, "models", "hunyuan3d-multiview")
+        os.makedirs(cache_dir, exist_ok=True)
+
+        print(f"   📁 Model cache directory: {cache_dir}")
+
+        # Try loading from cache first (no network calls)
+        model_path = None
+        try:
+            print(f"   🔍 Checking for cached model...")
+            model_path = huggingface_hub.snapshot_download(
+                repo_id=config.multiview_pretrained_path,
+                allow_patterns=["hunyuan3d-paintpbr-v2-1/*"],
+                cache_dir=cache_dir,
+                local_files_only=True,  # Only use cache, no network
+            )
+            print(f"   ✅ Using cached model (fast!)")
+        except Exception:
+            # Cache miss or incomplete - download from HuggingFace
+            print(f"   📥 Downloading model from HuggingFace (first time)...")
+            model_path = huggingface_hub.snapshot_download(
+                repo_id=config.multiview_pretrained_path,
+                allow_patterns=["hunyuan3d-paintpbr-v2-1/*"],
+                cache_dir=cache_dir,
+            )
 
         model_path = os.path.join(model_path, "hunyuan3d-paintpbr-v2-1")
-                
+
+        # Prepare pipeline loading args with attention mode
+        pipeline_args = {
+            "torch_dtype": torch.float16
+        }
+
+        # Map attention mode to diffusers attn_implementation
+        attention_mode = getattr(config, 'attention_mode', 'sdpa')
+        if attention_mode == "flash":
+            pipeline_args["attn_implementation"] = "flash_attention_2"
+            print(f"   🔥 Enabling Flash Attention 2 during pipeline load...")
+        elif attention_mode == "sdpa":
+            pipeline_args["attn_implementation"] = "sdpa"
+            print(f"   ⚡ Using SDPA attention (PyTorch auto-select)...")
+
         pipeline = HunyuanPaintPipeline.from_pretrained(
             model_path,
-            torch_dtype=torch.float16
+            **pipeline_args
         )
 
         pipeline.scheduler = EulerAncestralDiscreteScheduler.from_config(pipeline.scheduler.config, timestep_spacing="trailing")

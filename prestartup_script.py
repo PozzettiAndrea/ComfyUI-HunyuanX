@@ -243,6 +243,173 @@ def setup_torch_library_path():
                 print(f"✅ ComfyUI-MeshCraft: Added PyTorch libs to LD_LIBRARY_PATH: {torch_lib_path}")
 
 
+def install_flash_attention():
+    """
+    Install Flash Attention 2 for optimal diffusion model performance.
+
+    Flash Attention provides 10-20% faster inference on modern GPUs (RTX 4090/5090, etc.)
+    Falls back gracefully to SDPA if installation fails.
+    """
+    print("\n" + "="*80)
+    print("🚀 ComfyUI-MeshCraft: Checking Flash Attention...")
+    print("="*80 + "\n")
+
+    # Check if already installed
+    try:
+        import flash_attn
+        print(f"✅ Flash Attention {flash_attn.__version__} already installed")
+        return True
+    except ImportError:
+        pass
+
+    print("   Flash Attention not found, attempting installation...")
+    print("   This provides 10-20% faster inference on modern GPUs")
+    print("   (Compilation may take 3-5 minutes)\n")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "flash-attn==2.8.2", "--no-build-isolation"],
+            capture_output=True,
+            text=True,
+            timeout=600  # 10 minute timeout for compilation
+        )
+
+        if result.returncode == 0:
+            print("\n" + "="*80)
+            print("✅ Flash Attention installed successfully!")
+            print("   Your multiview model will use Flash Attention for faster inference")
+            print("="*80 + "\n")
+            return True
+        else:
+            print("\n" + "="*80)
+            print("⚠️  Flash Attention installation failed (non-critical)")
+            print("   Model will fall back to SDPA (still fast on modern GPUs)")
+            print("   Error:", result.stderr[-200:] if result.stderr else "Unknown")
+            print("="*80 + "\n")
+            return False
+
+    except subprocess.TimeoutExpired:
+        print("\n" + "="*80)
+        print("⚠️  Flash Attention installation timed out (non-critical)")
+        print("   Model will fall back to SDPA")
+        print("="*80 + "\n")
+        return False
+    except Exception as e:
+        print(f"\n⚠️  Flash Attention installation error: {e}")
+        print("   Model will fall back to SDPA (non-critical)\n")
+        return False
+
+
+def compile_mesh_inpaint_processor():
+    """
+    Compile the mesh_inpaint_processor C++ extension for texture inpainting.
+
+    This enables vertex-aware UV texture inpainting for high-quality PBR textures.
+    """
+    print("\n" + "="*80)
+    print("🔧 ComfyUI-MeshCraft: Checking mesh_inpaint_processor...")
+    print("="*80 + "\n")
+
+    # Check if already compiled
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    renderer_dir = os.path.join(current_dir, "hy3dpaint", "DifferentiableRenderer")
+
+    # Look for compiled .so file
+    import glob
+    so_files = glob.glob(os.path.join(renderer_dir, "mesh_inpaint_processor*.so"))
+
+    if so_files:
+        print(f"✅ mesh_inpaint_processor already compiled: {os.path.basename(so_files[0])}")
+        return True
+
+    print("   mesh_inpaint_processor not compiled, building now...")
+    print("   This enables vertex-aware texture inpainting\n")
+
+    # Ensure pybind11 is installed
+    try:
+        import pybind11
+    except ImportError:
+        print("   Installing pybind11...")
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "pybind11"],
+            capture_output=True,
+            timeout=60
+        )
+        if result.returncode != 0:
+            print("⚠️  Failed to install pybind11, skipping mesh_inpaint_processor")
+            return False
+
+    # Ensure python3-dev is installed (Linux only)
+    if sys.platform == "linux":
+        import shutil
+        if not shutil.which("python3-config"):
+            print("   Installing python3-dev...")
+            try:
+                is_root = os.geteuid() == 0
+                cmd_prefix = [] if is_root else ["sudo", "-n"]
+
+                result = subprocess.run(
+                    cmd_prefix + ["apt-get", "install", "-y", "python3-dev"],
+                    capture_output=True,
+                    timeout=120
+                )
+                if result.returncode != 0:
+                    print("⚠️  Failed to install python3-dev, skipping compilation")
+                    return False
+            except Exception as e:
+                print(f"⚠️  Could not install python3-dev: {e}")
+                return False
+
+    # Compile the extension
+    compile_script = os.path.join(renderer_dir, "compile_mesh_painter.sh")
+    if not os.path.exists(compile_script):
+        print(f"⚠️  Compile script not found: {compile_script}")
+        return False
+
+    try:
+        original_dir = os.getcwd()
+        os.chdir(renderer_dir)
+
+        result = subprocess.run(
+            ["bash", "compile_mesh_painter.sh"],
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+
+        os.chdir(original_dir)
+
+        if result.returncode == 0:
+            # Verify compilation succeeded
+            so_files = glob.glob(os.path.join(renderer_dir, "mesh_inpaint_processor*.so"))
+            if so_files:
+                print("\n" + "="*80)
+                print("✅ mesh_inpaint_processor compiled successfully!")
+                print(f"   Built: {os.path.basename(so_files[0])}")
+                print("="*80 + "\n")
+                return True
+            else:
+                print("\n⚠️  Compilation appeared to succeed but .so file not found")
+                return False
+        else:
+            print("\n" + "="*80)
+            print("⚠️  mesh_inpaint_processor compilation failed")
+            print("   Texture inpainting may not work optimally")
+            if result.stderr:
+                print(f"   Error: {result.stderr[-200:]}")
+            print("="*80 + "\n")
+            return False
+
+    except subprocess.TimeoutExpired:
+        print("⚠️  Compilation timed out")
+        os.chdir(original_dir)
+        return False
+    except Exception as e:
+        print(f"⚠️  Compilation error: {e}")
+        os.chdir(original_dir)
+        return False
+
+
 def install_blender():
     """
     Install Blender if not already installed.
@@ -341,6 +508,12 @@ def install_blender():
 if __name__ != "__main__":
     # Set up library paths first
     setup_torch_library_path()
+
+    # Install Flash Attention for optimal diffusion performance
+    install_flash_attention()
+
+    # Compile mesh inpaint processor for texture inpainting
+    compile_mesh_inpaint_processor()
 
     # Install Blender if needed (for RGB multiview rendering)
     install_blender()
