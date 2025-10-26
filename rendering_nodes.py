@@ -40,6 +40,9 @@ def _lazy_import(module_name):
         elif module_name == "Hunyuan3DPaintConfig":
             from .hy3dpaint.textureGenPipeline import Hunyuan3DPaintConfig
             _LAZY_IMPORTS["Hunyuan3DPaintConfig"] = Hunyuan3DPaintConfig
+        elif module_name == "ViewProcessor":
+            from .hy3dpaint.utils.pipeline_utils import ViewProcessor
+            _LAZY_IMPORTS["ViewProcessor"] = ViewProcessor
 
     return _LAZY_IMPORTS.get(module_name)
 
@@ -735,6 +738,336 @@ class GenerateMultiviewPBR:
 
 
 # =============================================================================
+# Node 5: Bake Multiview Textures
+# =============================================================================
+
+class BakeMultiviewTextures:
+    """
+    Bake multiview PBR images onto mesh UV texture space.
+
+    This node performs pure geometric texture projection without AI inference:
+    1. Back-projects each view image onto the mesh's UV coordinates
+    2. Weights each projection by viewing angle (front-facing surfaces weighted higher)
+    3. Blends all views with weighted averaging
+
+    No AI model needed - just raytracing and blending mathematics!
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "mesh": ("TRIMESH", {
+                    "tooltip": "3D mesh with UV coordinates"
+                }),
+                "camera_config": ("HY3D21CAMERA", {
+                    "tooltip": "Camera positions matching the multiview images"
+                }),
+                "albedo": ("IMAGE", {
+                    "tooltip": "Multiview albedo images (batch from GenerateMultiviewPBR)"
+                }),
+                "mr": ("IMAGE", {
+                    "tooltip": "Multiview metallic-roughness images (batch from GenerateMultiviewPBR)"
+                }),
+                "texture_size": ("INT", {
+                    "default": 1024,
+                    "min": 512,
+                    "max": 4096,
+                    "step": 512,
+                    "tooltip": "UV texture resolution"
+                }),
+                "bake_exp": ("FLOAT", {
+                    "default": 4.0,
+                    "min": 1.0,
+                    "max": 10.0,
+                    "step": 0.5,
+                    "tooltip": "Angular weighting exponent (higher = prefer front-facing views more)"
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE", "IMAGE", "IMAGE", "IMAGE")
+    RETURN_NAMES = ("albedo_texture", "albedo_mask", "mr_texture", "mr_mask")
+    FUNCTION = "bake"
+    CATEGORY = "MeshCraft/Rendering"
+
+    def bake(self, mesh, camera_config, albedo, mr, texture_size, bake_exp):
+        """
+        Bake multiview images onto UV texture using geometric projection.
+
+        Args:
+            mesh: Input mesh with UV coordinates
+            camera_config: Camera configuration (azimuth, elevation, weights)
+            albedo: Batch of albedo view images
+            mr: Batch of metallic-roughness view images
+            texture_size: Output UV texture resolution
+            bake_exp: Angular weighting exponent
+
+        Returns:
+            Tuple of (albedo_texture, albedo_mask, mr_texture, mr_mask)
+        """
+        # Lazy import dependencies
+        MeshRender = _lazy_import("MeshRender")
+        ViewProcessor = _lazy_import("ViewProcessor")
+        Hunyuan3DPaintConfig = _lazy_import("Hunyuan3DPaintConfig")
+        torch = _lazy_import("torch")
+
+        # Extract camera parameters
+        camera_azims = camera_config["selected_camera_azims"]
+        camera_elevs = camera_config["selected_camera_elevs"]
+        view_weights = camera_config["selected_view_weights"]
+        ortho_scale = camera_config.get("ortho_scale", 1.0)
+
+        # Convert IMAGE tensors to PIL images for processing
+        albedo_pil = tensor_to_pil_images(albedo)
+        mr_pil = tensor_to_pil_images(mr)
+
+        # Create minimal config for baking (doesn't need full pipeline config)
+        config = Hunyuan3DPaintConfig(
+            resolution=512,  # Not used for baking, just required by config
+            camera_azims=camera_azims,
+            camera_elevs=camera_elevs,
+            view_weights=view_weights,
+            ortho_scale=ortho_scale,
+            texture_size=texture_size
+        )
+
+        # Override bake_exp with user's choice
+        config.bake_exp = bake_exp
+
+        print(f"🔧 Creating renderer for baking (texture_size={texture_size})")
+
+        # Create mesh renderer for back-projection
+        renderer = MeshRender(
+            default_resolution=512,  # View resolution (not critical for baking)
+            texture_size=texture_size,
+            bake_mode="back_sample",
+            raster_mode="cr",
+            ortho_scale=ortho_scale
+        )
+
+        # Load mesh into renderer
+        renderer.load_mesh(mesh=mesh)
+
+        # Create view processor for baking algorithm
+        view_processor = ViewProcessor(config, renderer)
+
+        print(f"🎨 Baking albedo texture ({len(albedo_pil)} views)...")
+
+        # Bake albedo texture
+        albedo_texture, albedo_mask = view_processor.bake_from_multiview(
+            albedo_pil,
+            camera_elevs,
+            camera_azims,
+            view_weights
+        )
+
+        print(f"🎨 Baking MR texture ({len(mr_pil)} views)...")
+
+        # Bake MR texture
+        mr_texture, mr_mask = view_processor.bake_from_multiview(
+            mr_pil,
+            camera_elevs,
+            camera_azims,
+            view_weights
+        )
+
+        print(f"✅ Baking complete!")
+
+        # Convert outputs to ComfyUI IMAGE format
+        # Textures are torch tensors (H, W, C), masks are bool tensors (H, W, 1)
+
+        # Ensure textures are in [0,1] range and add batch dimension
+        if albedo_texture.max() > 1.0:
+            albedo_texture = albedo_texture / 255.0
+        if mr_texture.max() > 1.0:
+            mr_texture = mr_texture / 255.0
+
+        albedo_texture = albedo_texture.unsqueeze(0)  # Add batch dimension
+        mr_texture = mr_texture.unsqueeze(0)
+
+        # Convert masks to float images (white=covered, black=uncovered)
+        albedo_mask = albedo_mask.float().unsqueeze(0)  # (1, H, W, 1)
+        mr_mask = mr_mask.float().unsqueeze(0)
+
+        return (albedo_texture, albedo_mask, mr_texture, mr_mask)
+
+
+class InpaintTextures:
+    """
+    Inpaint missing areas in baked textures using traditional image inpainting.
+
+    This node fills holes in UV textures where no views projected (mask=0).
+    Uses OpenCV inpainting algorithms - no AI inference needed!
+
+    Methods:
+    - NS (Navier-Stokes): Fast, good for small holes
+    - Telea: Slower, better for larger gaps
+    - vertex_inpaint: Uses mesh vertex data to guide inpainting
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "albedo_texture": ("IMAGE", {"tooltip": "Baked albedo texture with holes"}),
+                "albedo_mask": ("IMAGE", {"tooltip": "Mask showing valid pixels (1=filled, 0=hole)"}),
+                "mr_texture": ("IMAGE", {"tooltip": "Baked metallic-roughness texture with holes"}),
+                "mr_mask": ("IMAGE", {"tooltip": "Mask showing valid pixels (1=filled, 0=hole)"}),
+                "mesh": ("TRIMESH", {"tooltip": "Mesh for vertex-guided inpainting"}),
+                "texture_size": ("INT", {"default": 1024, "min": 512, "max": 4096, "step": 512, "tooltip": "UV texture resolution"}),
+                "method": (["NS", "Telea"], {"default": "NS", "tooltip": "Inpainting algorithm"}),
+                "vertex_inpaint": ("BOOLEAN", {"default": True, "tooltip": "Use mesh vertices to guide inpainting"}),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE", "IMAGE")
+    RETURN_NAMES = ("albedo_inpainted", "mr_inpainted")
+    FUNCTION = "inpaint"
+    CATEGORY = "MeshCraft/Rendering"
+
+    def inpaint(self, albedo_texture, albedo_mask, mr_texture, mr_mask, mesh, texture_size, method, vertex_inpaint):
+        # Lazy import dependencies
+        MeshRender = _lazy_import("MeshRender")
+        ViewProcessor = _lazy_import("ViewProcessor")
+        Hunyuan3DPaintConfig = _lazy_import("Hunyuan3DPaintConfig")
+        torch = _lazy_import("torch")
+        np = _lazy_import("np")
+
+        # Create minimal config
+        config = Hunyuan3DPaintConfig(
+            resolution=512,
+            camera_azims=[0],
+            camera_elevs=[0],
+            view_weights=[1.0],
+            ortho_scale=1.0,
+            texture_size=texture_size
+        )
+
+        # Create mesh renderer
+        renderer = MeshRender(
+            default_resolution=512,
+            texture_size=texture_size,
+            bake_mode="back_sample",
+            raster_mode="cr",
+            ortho_scale=1.0
+        )
+        renderer.load_mesh(mesh=mesh)
+
+        # Create view processor for inpainting
+        view_processor = ViewProcessor(config, renderer)
+
+        # Convert masks to numpy (0-255 uint8 format)
+        albedo_mask_np = (albedo_mask.squeeze().cpu().numpy() * 255).astype(np.uint8)
+        mr_mask_np = (mr_mask.squeeze().cpu().numpy() * 255).astype(np.uint8)
+
+        # Inpaint albedo
+        albedo_inpainted = view_processor.texture_inpaint(
+            albedo_texture.squeeze(0),  # Remove batch dim
+            albedo_mask_np,
+            vertex_inpaint=vertex_inpaint,
+            method=method
+        )
+
+        # Inpaint MR
+        mr_inpainted = view_processor.texture_inpaint(
+            mr_texture.squeeze(0),  # Remove batch dim
+            mr_mask_np,
+            vertex_inpaint=vertex_inpaint,
+            method=method
+        )
+
+        # Convert back to ComfyUI format
+        if not isinstance(albedo_inpainted, torch.Tensor):
+            albedo_inpainted = torch.tensor(albedo_inpainted, dtype=torch.float32)
+        if not isinstance(mr_inpainted, torch.Tensor):
+            mr_inpainted = torch.tensor(mr_inpainted, dtype=torch.float32)
+
+        # Ensure [0, 1] range
+        if albedo_inpainted.max() > 1.0:
+            albedo_inpainted = albedo_inpainted / 255.0
+        if mr_inpainted.max() > 1.0:
+            mr_inpainted = mr_inpainted / 255.0
+
+        # Add batch dimension
+        albedo_inpainted = albedo_inpainted.unsqueeze(0)
+        mr_inpainted = mr_inpainted.unsqueeze(0)
+
+        return (albedo_inpainted, mr_inpainted)
+
+
+class ApplyAndSaveTexturedMesh:
+    """
+    Apply PBR textures to mesh and save as textured OBJ + GLB files.
+
+    This node:
+    1. Applies albedo texture to mesh
+    2. Applies metallic-roughness texture
+    3. Saves mesh as .obj with texture JPGs
+    4. Converts to .glb with PBR materials
+
+    No AI inference - just file I/O!
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "mesh": ("TRIMESH", {"tooltip": "3D mesh with UV coordinates"}),
+                "albedo_texture": ("IMAGE", {"tooltip": "Final albedo texture (after inpainting)"}),
+                "mr_texture": ("IMAGE", {"tooltip": "Final metallic-roughness texture (after inpainting)"}),
+                "texture_size": ("INT", {"default": 1024, "min": 512, "max": 4096, "step": 512, "tooltip": "UV texture resolution"}),
+                "filename": ("STRING", {"default": "textured_mesh", "tooltip": "Output filename (no extension)"}),
+            },
+        }
+
+    RETURN_TYPES = ("STRING", "STRING")
+    RETURN_NAMES = ("obj_path", "glb_path")
+    FUNCTION = "apply_and_save"
+    CATEGORY = "MeshCraft/Rendering"
+
+    def apply_and_save(self, mesh, albedo_texture, mr_texture, texture_size, filename):
+        # Lazy import dependencies
+        MeshRender = _lazy_import("MeshRender")
+        folder_paths = _lazy_import("folder_paths")
+        os = _lazy_import("os")
+
+        # Import GLB conversion function
+        from .hy3dpaint.textureGenPipeline import quick_convert_with_obj2gltf
+
+        # Create mesh renderer
+        renderer = MeshRender(
+            default_resolution=512,
+            texture_size=texture_size,
+            bake_mode="back_sample",
+            raster_mode="cr",
+            ortho_scale=1.0
+        )
+        renderer.load_mesh(mesh=mesh)
+
+        # Apply textures to renderer
+        renderer.set_texture(albedo_texture.squeeze(0), force_set=True)
+        renderer.set_texture_mr(mr_texture.squeeze(0))
+
+        # Get output directory
+        output_dir = folder_paths.get_output_directory()
+        obj_path = os.path.join(output_dir, f"{filename}.obj")
+
+        # Save mesh as OBJ with textures
+        renderer.save_mesh(obj_path, downsample=False)
+
+        # Convert to GLB
+        glb_path = obj_path.replace(".obj", ".glb")
+        quick_convert_with_obj2gltf(obj_path, glb_path)
+
+        print(f"✓ Saved textured mesh:")
+        print(f"  OBJ: {obj_path}")
+        print(f"  GLB: {glb_path}")
+
+        return (obj_path, glb_path)
+
+
+# =============================================================================
 # Node Registration
 # =============================================================================
 
@@ -743,6 +1076,9 @@ NODE_CLASS_MAPPINGS = {
     "MeshCraft_RenderConditioningMaps": RenderConditioningMaps,
     "MeshCraft_RenderRGBMultiview": RenderRGBMultiview,
     "MeshCraft_GenerateMultiviewPBR": GenerateMultiviewPBR,
+    "MeshCraft_BakeMultiviewTextures": BakeMultiviewTextures,
+    "MeshCraft_InpaintTextures": InpaintTextures,
+    "MeshCraft_ApplyAndSaveTexturedMesh": ApplyAndSaveTexturedMesh,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -750,4 +1086,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "MeshCraft_RenderConditioningMaps": "Render Conditioning Maps (Normals + Positions)",
     "MeshCraft_RenderRGBMultiview": "Render RGB Multiview Images",
     "MeshCraft_GenerateMultiviewPBR": "Generate Multiview PBR Textures",
+    "MeshCraft_BakeMultiviewTextures": "Bake Multiview Textures",
+    "MeshCraft_InpaintTextures": "Inpaint Textures",
+    "MeshCraft_ApplyAndSaveTexturedMesh": "Apply and Save Textured Mesh",
 }
