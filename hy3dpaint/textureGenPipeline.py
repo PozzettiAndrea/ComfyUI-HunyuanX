@@ -138,9 +138,9 @@ class Hunyuan3DPaintPipeline:
         # CRITICAL: Ensure model pipeline is on the correct device
         model = Hunyuan3DPaintPipeline._cached_multiview_model
         if hasattr(model, 'pipeline'):
-            # Move the entire pipeline (including VAE, UNet, etc) to device
-            model.pipeline.to(device)
-            print(f"✓ Pipeline moved to {device}")
+            # Move the entire pipeline (including VAE, UNet, etc) to device with fp16 precision
+            model.pipeline.to(device, dtype=torch.float16)
+            print(f"✓ Pipeline moved to {device} (fp16)")
 
         return model
 

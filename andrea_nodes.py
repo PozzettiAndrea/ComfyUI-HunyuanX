@@ -15,6 +15,7 @@ import numpy as np
 import cv2
 from PIL import Image
 from pathlib import Path
+import trimesh as Trimesh
 
 import folder_paths
 import comfy.model_management as mm
@@ -46,6 +47,9 @@ def _lazy_import(module_name):
         elif module_name == "comfy_utils":
             from comfy.utils import load_torch_file
             _LAZY_IMPORTS["load_torch_file"] = load_torch_file
+        elif module_name == "trimesh":
+            import trimesh as Trimesh
+            _LAZY_IMPORTS["trimesh"] = Trimesh
     return _LAZY_IMPORTS.get(module_name)
 
 
@@ -302,7 +306,7 @@ class LoadDinoModel:
         except Exception as e:
             raise ValueError(f"Failed to load DINO from HuggingFace: {e}")
 
-        self.conditioner.to(device)
+        self.conditioner.to(device).to(torch.float16)
         self.conditioner.eval()
         self.current_model_id = model_id
 
@@ -827,7 +831,7 @@ class LoadHunyuanDiT:
 
         scheduler = instantiate_from_config(config['scheduler'])
 
-        dit_model.to(device)
+        dit_model.to(device).to(torch.float16)
         dit_model.eval()
 
         print(f"✅ Loaded DiT model (skipped VAE for memory savings)")
@@ -979,7 +983,7 @@ class LoadHunyuanVAE:
             # Standalone VAE checkpoint
             vae.load_state_dict(ckpt, strict=False)
 
-        vae.to(device)
+        vae.to(device).to(torch.float16)
         vae.eval()
 
         print(f"✅ Loaded VAE (skipped DiT for memory savings)")
