@@ -85,8 +85,9 @@ if config["engine"] == "CYCLES":
     scene.cycles.filter_width = 1.0  # Hunyuan3D uses 1.0, not 0.01
     scene.cycles.diffuse_bounces = 1
     scene.cycles.glossy_bounces = 1
-    scene.cycles.use_denoising = True
-    print(f"Cycles: samples={config['samples']}, bounces=1, filter=BOX")
+    # Denoising disabled - apt Blender lacks OpenImageDenoiser support
+    scene.cycles.use_denoising = False
+    print(f"Cycles: samples={config['samples']}, bounces=1, filter=BOX, denoising=off")
 
 # Create camera
 camera_data = bpy.data.cameras.new(name="Camera")

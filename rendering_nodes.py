@@ -1030,8 +1030,7 @@ class ApplyAndSaveTexturedMesh:
     def apply_and_save(self, mesh, albedo_texture, mr_texture, texture_size, filename):
         # Lazy import dependencies
         MeshRender = _lazy_import("MeshRender")
-        folder_paths = _lazy_import("folder_paths")
-        os = _lazy_import("os")
+        # Note: folder_paths and os are already imported at module level (lines 13, 16)
 
         # Import GLB conversion function
         from .hy3dpaint.textureGenPipeline import quick_convert_with_obj2gltf

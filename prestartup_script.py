@@ -76,18 +76,18 @@ def install_cuda_libraries():
         print("   Updating package list...")
         update_result = subprocess.run(
             cmd_prefix + ["apt-get", "update", "-qq"],
-            capture_output=True,
-            timeout=120,
-            text=True
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+            timeout=120
         )
 
         # Install cuda-libraries-dev-12-8
         print("   Installing CUDA libraries (this may take 1-2 minutes)...")
         result = subprocess.run(
             cmd_prefix + ["apt-get", "install", "-y", "cuda-libraries-dev-12-8"],
-            capture_output=True,
-            timeout=300,
-            text=True
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+            timeout=300
         )
 
         if result.returncode == 0:
@@ -180,8 +180,8 @@ def compile_cuda_extension():
         # Run setup.py install
         result = subprocess.run(
             [sys.executable, "setup.py", "install"],
-            capture_output=True,
-            text=True,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
             timeout=300  # 5 minute timeout
         )
 
@@ -195,8 +195,7 @@ def compile_cuda_extension():
         else:
             print("\n" + "="*80)
             print("❌ ComfyUI-MeshCraft: CUDA extension compilation failed!")
-            print("   STDOUT:", result.stdout[-500:] if len(result.stdout) > 500 else result.stdout)
-            print("   STDERR:", result.stderr[-500:] if len(result.stderr) > 500 else result.stderr)
+            print("   Check the output above for details")
             print("="*80 + "\n")
             return False
 
@@ -269,8 +268,8 @@ def install_flash_attention():
     try:
         result = subprocess.run(
             [sys.executable, "-m", "pip", "install", "flash-attn==2.8.2", "--no-build-isolation"],
-            capture_output=True,
-            text=True,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
             timeout=600  # 10 minute timeout for compilation
         )
 
@@ -284,7 +283,6 @@ def install_flash_attention():
             print("\n" + "="*80)
             print("⚠️  Flash Attention installation failed (non-critical)")
             print("   Model will fall back to SDPA (still fast on modern GPUs)")
-            print("   Error:", result.stderr[-200:] if result.stderr else "Unknown")
             print("="*80 + "\n")
             return False
 
@@ -332,7 +330,8 @@ def compile_mesh_inpaint_processor():
         print("   Installing pybind11...")
         result = subprocess.run(
             [sys.executable, "-m", "pip", "install", "pybind11"],
-            capture_output=True,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
             timeout=60
         )
         if result.returncode != 0:
@@ -350,7 +349,8 @@ def compile_mesh_inpaint_processor():
 
                 result = subprocess.run(
                     cmd_prefix + ["apt-get", "install", "-y", "python3-dev"],
-                    capture_output=True,
+                    stdout=sys.stdout,
+                    stderr=sys.stderr,
                     timeout=120
                 )
                 if result.returncode != 0:
@@ -372,8 +372,8 @@ def compile_mesh_inpaint_processor():
 
         result = subprocess.run(
             ["bash", "compile_mesh_painter.sh"],
-            capture_output=True,
-            text=True,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
             timeout=120
         )
 
@@ -395,8 +395,7 @@ def compile_mesh_inpaint_processor():
             print("\n" + "="*80)
             print("⚠️  mesh_inpaint_processor compilation failed")
             print("   Texture inpainting may not work optimally")
-            if result.stderr:
-                print(f"   Error: {result.stderr[-200:]}")
+            print("   Check the output above for details")
             print("="*80 + "\n")
             return False
 
@@ -468,7 +467,8 @@ def install_blender():
         print("   Updating package list...")
         result = subprocess.run(
             cmd_prefix + ["apt-get", "update"],
-            capture_output=True,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
             timeout=120
         )
 
@@ -480,7 +480,8 @@ def install_blender():
         print("   Installing Blender + OpenGL libraries (this may take a few minutes)...")
         result = subprocess.run(
             cmd_prefix + ["apt-get", "install", "-y", "blender", "libegl1", "libgl1", "libgomp1"],
-            capture_output=True,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
             timeout=600  # 10 minute timeout
         )
 
@@ -510,7 +511,9 @@ if __name__ != "__main__":
     setup_torch_library_path()
 
     # Install Flash Attention for optimal diffusion performance
-    install_flash_attention()
+    # DISABLED: Takes 5-10 minutes to compile, non-critical (10-20% speedup)
+    # To install manually: pip install flash-attn==2.8.2 --no-build-isolation
+    # install_flash_attention()
 
     # Compile mesh inpaint processor for texture inpainting
     compile_mesh_inpaint_processor()

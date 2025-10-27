@@ -33,7 +33,7 @@ except:
     print("Bpy IO CAN NOT BE Imported!!!")
 
 try:
-    from mesh_inpaint_processor import meshVerticeInpaint  # , meshVerticeColor
+    from .mesh_inpaint_processor import meshVerticeInpaint  # , meshVerticeColor
 except:
     print("InPaint Function CAN NOT BE Imported!!!")
 
