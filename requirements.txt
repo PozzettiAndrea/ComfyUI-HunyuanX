@@ -9,7 +9,6 @@ configargparse
 transformers
 diffusers
 accelerate
-pytorch-lightning
 torchvision
 opencv-python
 huggingface-hub
@@ -20,3 +19,21 @@ timm
 meshlib
 rembg
 onnxruntime
+
+# TRELLIS Dependencies (for 3D generation with multi-view support)
+imageio>=2.0.0
+imageio-ffmpeg
+einops>=0.7.0
+easydict
+plotly
+pyvista
+pymeshfix
+igraph
+utils3d
+
+# Optional TRELLIS performance dependencies (require compilation - install manually if needed)
+# flash-attn>=2.0.0  # 10-20% faster inference, takes 5-10 min to compile
+# xformers>=0.0.20  # Alternative to flash-attn
+# spconv-cu118  # Sparse convolution - match to your CUDA version
+# kaolin  # 3D operations library
+# nvdiffrast  # Differentiable rendering

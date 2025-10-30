@@ -505,6 +505,91 @@ def install_blender():
         return False
 
 
+def install_trellis_dependencies():
+    """
+    Install TRELLIS-specific dependencies for multi-view 3D generation.
+
+    TRELLIS requires:
+    - imageio with ffmpeg support (for video rendering)
+    - einops (for tensor operations)
+    - Optional: flash-attn or xformers (for performance)
+
+    Heavy dependencies (spconv, kaolin, nvdiffrast) are left for manual installation
+    as they require CUDA compilation and are version-specific.
+    """
+    print("\n" + "="*80)
+    print("🎲 ComfyUI-MeshCraft: Checking TRELLIS dependencies...")
+    print("="*80 + "\n")
+
+    # List of pip-installable dependencies
+    dependencies = [
+        ("imageio", ">=2.0.0"),
+        ("imageio-ffmpeg", None),  # For video export
+        ("einops", ">=0.7.0"),
+    ]
+
+    all_installed = True
+
+    for package, version_spec in dependencies:
+        try:
+            # Try to import the package
+            __import__(package.replace("-", "_"))
+            print(f"✅ {package} already installed")
+        except ImportError:
+            print(f"   Installing {package}{version_spec or ''}...")
+            try:
+                install_spec = f"{package}{version_spec}" if version_spec else package
+                result = subprocess.run(
+                    [sys.executable, "-m", "pip", "install", install_spec, "-q"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=120
+                )
+
+                if result.returncode == 0:
+                    print(f"✅ {package} installed successfully")
+                else:
+                    print(f"⚠️  Failed to install {package}")
+                    all_installed = False
+
+            except Exception as e:
+                print(f"⚠️  Error installing {package}: {e}")
+                all_installed = False
+
+    # Check for TRELLIS package (directory check only - DO NOT import torch!)
+    trellis_path = os.path.join(os.path.dirname(__file__), "trellis", "TRELLIS")
+    trellis_pipeline_file = os.path.join(trellis_path, "trellis", "pipelines", "trellis_image_to_3d.py")
+
+    if os.path.exists(trellis_pipeline_file):
+        print("✅ TRELLIS package found (local repository)")
+    else:
+        print("⚠️  TRELLIS package not found")
+        print("   The TRELLIS submodule may not be initialized")
+        print("   Run: git submodule update --init --recursive")
+        all_installed = False
+
+    # Inform about manual dependencies
+    print("\n" + "-"*80)
+    print("ℹ️  Optional TRELLIS dependencies (install manually for best performance):")
+    print("   • flash-attn (10-20% faster): pip install flash-attn --no-build-isolation")
+    print("   • xformers (alternative): pip install xformers")
+    print("\n   Advanced (require compilation, version-specific):")
+    print("   • spconv (sparse convolution): See https://github.com/traveller59/spconv")
+    print("   • kaolin (3D ops): See https://github.com/NVIDIAGameWorks/kaolin")
+    print("   • nvdiffrast (rendering): See https://github.com/NVlabs/nvdiffrast")
+    print("-"*80 + "\n")
+
+    if all_installed:
+        print("✅ All basic TRELLIS dependencies installed!")
+    else:
+        print("⚠️  Some TRELLIS dependencies failed to install")
+        print("   TRELLIS nodes may not work correctly")
+
+    print("="*80 + "\n")
+
+    return all_installed
+
+
 # Run on import
 if __name__ != "__main__":
     # Set up library paths first
@@ -523,3 +608,6 @@ if __name__ != "__main__":
 
     # Compile CUDA extension if needed
     compile_cuda_extension()
+
+    # Install TRELLIS dependencies
+    install_trellis_dependencies()
