@@ -5,7 +5,7 @@ Complete 3D generation and manipulation package for ComfyUI.
 
 Features:
 - Full Hunyuan 3D 2.1 integration with model caching (~5-10x faster reloads)
-- Microsoft TRELLIS 3D generation with multi-view support
+- Microsoft TRELLIS 3D generation with granular pipeline control
 - Advanced mesh post-processing (clean, optimize, reduce faces)
 - UV unwrapping and texture baking
 - Batch processing capabilities
@@ -14,34 +14,31 @@ Features:
 Repository: https://github.com/YOUR_USERNAME/ComfyUI-MeshCraft
 """
 
-from .nodes import NODE_CLASS_MAPPINGS as MESH_NODES, NODE_DISPLAY_NAME_MAPPINGS as MESH_DISPLAY
-from .interpolation_nodes import NODE_CLASS_MAPPINGS as INTERP_NODES, NODE_DISPLAY_NAME_MAPPINGS as INTERP_DISPLAY
+import sys
+import os
 
-# Try to load Hunyuan nodes
-try:
-    from .hunyuan_nodes import NODE_CLASS_MAPPINGS as HUNYUAN_NODES, NODE_DISPLAY_NAME_MAPPINGS as HUNYUAN_DISPLAY
-    from .andrea_nodes import NODE_CLASS_MAPPINGS as ANDREA_NODES, NODE_DISPLAY_NAME_MAPPINGS as ANDREA_DISPLAY
-    from .rendering_nodes import NODE_CLASS_MAPPINGS as RENDERING_NODES, NODE_DISPLAY_NAME_MAPPINGS as RENDERING_DISPLAY
-    hunyuan_loaded = True
-except ImportError as e:
-    print(f"⚠️  ComfyUI-MeshCraft: Could not load Hunyuan nodes: {e}")
-    HUNYUAN_NODES = {}
-    HUNYUAN_DISPLAY = {}
-    ANDREA_NODES = {}
-    ANDREA_DISPLAY = {}
-    RENDERING_NODES = {}
-    RENDERING_DISPLAY = {}
-    hunyuan_loaded = False
+# Add lib/ to sys.path so hy3dshape and hy3dpaint are importable as top-level modules
+# This allows YAML configs to reference them directly (e.g., hy3dshape.hy3dshape.models)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+lib_path = os.path.join(current_dir, "lib")
+if lib_path not in sys.path:
+    sys.path.insert(0, lib_path)
 
-# Try to load TRELLIS nodes
-try:
-    from .trellis_nodes import NODE_CLASS_MAPPINGS as TRELLIS_NODES, NODE_DISPLAY_NAME_MAPPINGS as TRELLIS_DISPLAY
-    trellis_loaded = True
-except ImportError as e:
-    print(f"⚠️  ComfyUI-MeshCraft: Could not load TRELLIS nodes: {e}")
-    TRELLIS_NODES = {}
-    TRELLIS_DISPLAY = {}
-    trellis_loaded = False
+# Import from organized nodes/ directory
+from .nodes import (
+    MESH_NODES,
+    MESH_DISPLAY,
+    INTERP_NODES,
+    INTERP_DISPLAY,
+    HUNYUAN_NODES,
+    HUNYUAN_DISPLAY,
+    ANDREA_NODES,
+    ANDREA_DISPLAY,
+    RENDERING_NODES,
+    RENDERING_DISPLAY,
+    TRELLIS_NODES,
+    TRELLIS_DISPLAY,
+)
 
 # Merge all available nodes
 NODE_CLASS_MAPPINGS = {
@@ -63,13 +60,14 @@ NODE_DISPLAY_NAME_MAPPINGS = {
 }
 
 # Print status
-loaded_modules = ["mesh", "interpolation"]
-if hunyuan_loaded:
-    loaded_modules.extend(["hunyuan", "andrea", "rendering"])
-if trellis_loaded:
-    loaded_modules.append("trellis")
-
-print(f"✅ ComfyUI-MeshCraft: Loaded {' + '.join(loaded_modules)} nodes")
+num_nodes = len(NODE_CLASS_MAPPINGS)
+print(f"✅ ComfyUI-MeshCraft: Loaded {num_nodes} nodes")
+print(f"   • Mesh nodes: {len(MESH_NODES)}")
+print(f"   • Interpolation nodes: {len(INTERP_NODES)}")
+print(f"   • Hunyuan nodes: {len(HUNYUAN_NODES)}")
+print(f"   • Andrea nodes: {len(ANDREA_NODES)}")
+print(f"   • Rendering nodes: {len(RENDERING_NODES)}")
+print(f"   • TRELLIS nodes: {len(TRELLIS_NODES)}")
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
-__version__ = "0.3.0"  # Bump version for TRELLIS integration
+__version__ = "0.4.0"  # Major reorganization + TRELLIS granular pipeline

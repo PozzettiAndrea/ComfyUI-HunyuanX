@@ -19,8 +19,9 @@ timm
 meshlib
 rembg
 onnxruntime
+pytorch-lightning
 
-# TRELLIS Dependencies (for 3D generation with multi-view support)
+# TRELLIS Dependencies (for 3D generation with granular pipeline control)
 imageio>=2.0.0
 imageio-ffmpeg
 einops>=0.7.0
@@ -29,7 +30,11 @@ plotly
 pyvista
 pymeshfix
 igraph
-utils3d
+scipy
+ninja
+plyfile
+diso
+git+https://github.com/EasternJournalist/utils3d.git@9a4eb15e4021b67b12c460c7057d642626897ec8
 
 # Optional TRELLIS performance dependencies (require compilation - install manually if needed)
 # flash-attn>=2.0.0  # 10-20% faster inference, takes 5-10 min to compile

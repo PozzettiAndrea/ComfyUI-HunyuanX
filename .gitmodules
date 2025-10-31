@@ -1,3 +1,1 @@
-[submodule "trellis/TRELLIS"]
-	path = trellis/TRELLIS
-	url = https://github.com/microsoft/TRELLIS.git
+# Submodules removed - TRELLIS library now integrated directly in lib/trellis/

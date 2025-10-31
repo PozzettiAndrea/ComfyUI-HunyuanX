@@ -163,7 +163,7 @@ def compile_cuda_extension():
 
     # Get path to custom_rasterizer setup.py
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    rasterizer_dir = os.path.join(current_dir, "hy3dpaint", "custom_rasterizer")
+    rasterizer_dir = os.path.join(current_dir, "lib", "hy3dpaint", "custom_rasterizer")
     setup_py = os.path.join(rasterizer_dir, "setup.py")
 
     if not os.path.exists(setup_py):
@@ -310,7 +310,7 @@ def compile_mesh_inpaint_processor():
 
     # Check if already compiled
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    renderer_dir = os.path.join(current_dir, "hy3dpaint", "DifferentiableRenderer")
+    renderer_dir = os.path.join(current_dir, "lib", "hy3dpaint", "DifferentiableRenderer")
 
     # Look for compiled .so file
     import glob
@@ -476,10 +476,13 @@ def install_blender():
             print("⚠️  ComfyUI-MeshCraft: apt-get update failed")
             return False
 
-        # Install Blender + required OpenGL libraries for headless rendering
-        print("   Installing Blender + OpenGL libraries (this may take a few minutes)...")
+        # Install Blender + required OpenGL and X11 libraries for headless rendering
+        # OpenGL libraries (libopengl0, libglu1-mesa, libosmesa6) needed for PyMeshLab plugins
+        print("   Installing Blender + OpenGL/X11 libraries (this may take a few minutes)...")
         result = subprocess.run(
-            cmd_prefix + ["apt-get", "install", "-y", "blender", "libegl1", "libgl1", "libgomp1"],
+            cmd_prefix + ["apt-get", "install", "-y", "blender", "libegl1", "libgl1", "libgomp1",
+                         "libxrender1", "libxi6", "libxrandr2", "libxxf86vm1", "libxfixes3",
+                         "libopengl0", "libglu1-mesa", "libosmesa6"],
             stdout=sys.stdout,
             stderr=sys.stderr,
             timeout=600  # 10 minute timeout

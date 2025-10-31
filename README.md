@@ -49,7 +49,38 @@ pip install -r requirements.txt
 
 The Hunyuan 3D nodes require two compiled extensions: `custom_rasterizer` (CUDA) and `DifferentiableRenderer` (C++).
 
-**Option A: Use Precompiled Wheels (Recommended)**
+**Automatic Compilation (Recommended)**
+
+ComfyUI-MeshCraft includes a `prestartup_script.py` that automatically compiles these extensions when ComfyUI starts. The extensions only need to be compiled once and will be cached.
+
+**Prerequisites:**
+- NVIDIA CUDA Toolkit (with `nvcc`)
+- G++ compiler version 12+ (recommended)
+- Python 3.10+
+- PyTorch with CUDA support
+- pybind11 (`pip install pybind11`)
+
+When you start ComfyUI, the prestartup script will:
+1. Check if extensions are already compiled (skip if they are)
+2. Check prerequisites (nvcc, g++, Python, PyTorch CUDA, pybind11)
+3. Automatically compile both extensions
+4. Display progress and report any errors
+
+**Manual Compilation (Alternative)**
+
+If you prefer to compile manually or need to recompile:
+
+```bash
+# Compile custom_rasterizer
+cd hy3dpaint/custom_rasterizer
+python setup.py install
+
+# Compile DifferentiableRenderer
+cd ../DifferentiableRenderer
+python setup.py install
+```
+
+**Using Precompiled Wheels**
 
 If precompiled wheels are available for your Python version:
 
@@ -62,59 +93,6 @@ pip install hy3dpaint/custom_rasterizer/dist/custom_rasterizer-0.1-cp312-cp312-l
 
 # Install DifferentiableRenderer (example for Python 3.12)
 pip install hy3dpaint/DifferentiableRenderer/dist/mesh_inpaint_processor-0.0.0-cp312-cp312-linux_x86_64.whl
-```
-
-**Option B: Automated Compilation (Advanced Users)**
-
-Use the automated compilation script that checks prerequisites and compiles both modules:
-
-```bash
-cd ComfyUI/custom_nodes/ComfyUI-MeshCraft
-./compile_extensions.sh
-```
-
-**Prerequisites for compilation:**
-- NVIDIA CUDA Toolkit (with `nvcc`)
-- G++ compiler version 12+ (recommended)
-- Python 3.10+
-- PyTorch with CUDA support
-- pybind11 (`pip install pybind11`)
-
-**Script options:**
-```bash
-# Show help
-./compile_extensions.sh --help
-
-# Verbose mode (see detailed compilation output)
-./compile_extensions.sh --verbose
-
-# Force compilation even if some prerequisites are missing
-./compile_extensions.sh --force
-
-# Skip import verification after compilation
-./compile_extensions.sh --skip-verify
-```
-
-The script will:
-1. Check all prerequisites (nvcc, g++, Python, PyTorch CUDA, pybind11)
-2. Check optional dependencies (Blender for UV unwrapping)
-3. Compile custom_rasterizer (CUDA extension)
-4. Compile DifferentiableRenderer (C++ extension)
-5. Verify both modules can be imported
-6. Report success or provide detailed error messages
-
-**Option C: Manual Compilation (Expert Users)**
-
-If you prefer manual control:
-
-```bash
-# Compile custom_rasterizer
-cd hy3dpaint/custom_rasterizer
-python setup.py install
-
-# Compile DifferentiableRenderer
-cd ../DifferentiableRenderer
-python setup.py install
 ```
 
 Restart ComfyUI after installation.
