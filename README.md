@@ -4,6 +4,7 @@
 
 Craft and transform 3D meshes in ComfyUI. Full Hunyuan 3D 2.1 integration with caching optimizations, advanced mesh processing, and experimental tools for prompt-based editing.
 
+
 ## Features
 
 ### 3D Generation (Powered by Hunyuan 3D 2.1)
