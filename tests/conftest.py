@@ -134,3 +134,89 @@ def pil_to_tensor(pil_image):
     img_np = np.array(pil_image).astype(np.float32) / 255.0
     # Add batch dimension
     return torch.from_numpy(img_np).unsqueeze(0)
+
+
+# Workflow testing fixtures
+
+@pytest.fixture
+def workflow_test_image():
+    """
+    Path to a test image for workflow execution tests.
+
+    Returns the path to a simple test image that can be used as input
+    to image-to-3D workflows.
+    """
+    # Create a simple test image if it doesn't exist
+    from pathlib import Path
+    test_image_path = Path(__file__).parent / "test_data" / "test_cube.png"
+
+    if not test_image_path.exists():
+        # Create test_data directory if needed
+        test_image_path.parent.mkdir(exist_ok=True)
+
+        # Create a simple 512x512 test image (white cube on black background)
+        img = Image.new('RGB', (512, 512), color='black')
+        # Draw a white square in the center
+        from PIL import ImageDraw
+        draw = ImageDraw.Draw(img)
+        draw.rectangle([156, 156, 356, 356], fill='white')
+        img.save(test_image_path)
+
+    return str(test_image_path)
+
+
+@pytest.fixture
+def load_workflow_json():
+    """
+    Helper fixture to load workflow JSON files.
+
+    Usage:
+        workflow = load_workflow_json("trellis-i2m.json")
+    """
+    import json
+    from pathlib import Path
+
+    def _load(workflow_name: str):
+        workflow_path = Path(__file__).parent.parent / "workflows" / workflow_name
+        with open(workflow_path) as f:
+            return json.load(f)
+
+    return _load
+
+
+@pytest.fixture
+def modify_workflow_attention():
+    """
+    Helper fixture to modify attention mechanism settings in workflows.
+
+    Usage:
+        modified = modify_workflow_attention(workflow, "xformers", "xformers-native")
+    """
+    import copy
+
+    def _modify(workflow: dict, sparse_attn: str, slat_attn: str):
+        """
+        Modify attention settings in Load_Trellis_Model nodes.
+
+        Args:
+            workflow: Workflow dict to modify
+            sparse_attn: Value for sparse_attn_impl
+                        ("flash-attn", "xformers", "torch-native")
+            slat_attn: Value for slat_attn_impl
+                      ("flash-native", "xformers-native", etc.)
+
+        Returns:
+            Modified copy of workflow dict
+        """
+        workflow_copy = copy.deepcopy(workflow)
+
+        for node in workflow_copy.get("nodes", []):
+            if node.get("type") == "Load_Trellis_Model":
+                # widgets_values: [model_type, sparse_attn_impl, slat_attn_impl]
+                if len(node.get("widgets_values", [])) >= 3:
+                    node["widgets_values"][1] = sparse_attn
+                    node["widgets_values"][2] = slat_attn
+
+        return workflow_copy
+
+    return _modify
