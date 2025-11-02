@@ -66,10 +66,10 @@ def check_and_fix_pytorch_version():
         cuda_ver_short = cuda_version.replace('.', '') if cuda_version else '128'
         cuda_tag = f"cu{cuda_ver_short}"
 
-        # Install PyTorch 2.8.0
+        # Install PyTorch 2.8.0 (let pip auto-resolve compatible torchvision/torchaudio)
         result = subprocess.run(
             [sys.executable, "-m", "pip", "install",
-             "torch==2.8.0", "torchvision==0.19.0", "torchaudio==2.8.0",
+             "torch==2.8.0", "torchvision", "torchaudio",
              "--extra-index-url", f"https://download.pytorch.org/whl/{cuda_tag}",
              "--force-reinstall"],
             stdout=sys.stdout,
@@ -84,7 +84,7 @@ def check_and_fix_pytorch_version():
         else:
             print("\n⚠️  PyTorch installation failed")
             print("   Please install manually:")
-            print(f"   pip install torch==2.8.0 torchvision==0.19.0 torchaudio==2.8.0 \\")
+            print(f"   pip install torch==2.8.0 torchvision torchaudio \\")
             print(f"       --extra-index-url https://download.pytorch.org/whl/{cuda_tag} --force-reinstall")
             return False
 
@@ -94,7 +94,7 @@ def check_and_fix_pytorch_version():
 
         result = subprocess.run(
             [sys.executable, "-m", "pip", "install",
-             "torch==2.8.0", "torchvision==0.19.0", "torchaudio==2.8.0",
+             "torch==2.8.0", "torchvision", "torchaudio",
              "--extra-index-url", "https://download.pytorch.org/whl/cu128"],
             stdout=sys.stdout,
             stderr=sys.stderr,
