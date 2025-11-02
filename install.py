@@ -56,8 +56,14 @@ def get_pip_command_early():
 
 
 def check_and_fix_pytorch_version():
-    """Check PyTorch version and automatically upgrade/downgrade if needed"""
-    print_header("🔍 Checking PyTorch Version")
+    """
+    Check PyTorch version and automatically fix if needed.
+
+    Installs torch, torchvision, and torchaudio together in a single command
+    so the package resolver can pick compatible versions. This prevents issues
+    where torchvision's dependencies upgrade torch to an incompatible version.
+    """
+    print_header("🔍 Checking PyTorch Stack (torch + torchvision + torchaudio)")
 
     try:
         import torch
@@ -81,13 +87,14 @@ def check_and_fix_pytorch_version():
         # Version is wrong - need to fix it
         print(f"\n⚠️  PyTorch {torch_version} is NOT compatible with Kaolin")
         print("   Kaolin requires PyTorch 2.5.0 - 2.8.0")
-        print("\n   Installing PyTorch 2.8.0 (recommended version)...\n")
+        print("\n   Installing PyTorch stack (torch + torchvision + torchaudio) together...\n")
 
         # Determine CUDA version for installation URL
         cuda_ver_short = cuda_version.replace('.', '') if cuda_version else '128'
         cuda_tag = f"cu{cuda_ver_short}"
 
-        # Install PyTorch 2.8.0 (let pip auto-resolve compatible torchvision/torchaudio)
+        # Install all three packages together so resolver picks compatible versions
+        # --force-reinstall ensures we override whatever requirements.txt installed
         pip_cmd = get_pip_command_early()
         result = subprocess.run(
             pip_cmd + ["install",
@@ -100,8 +107,8 @@ def check_and_fix_pytorch_version():
         )
 
         if result.returncode == 0:
-            print("\n✅ PyTorch 2.8.0 installed successfully!")
-            print("   Kaolin will now be able to install from prebuilt wheels")
+            print("\n✅ PyTorch stack installed successfully!")
+            print("   torch==2.8.0 + compatible torchvision/torchaudio")
             return True
         else:
             print("\n⚠️  PyTorch installation failed")
@@ -112,7 +119,7 @@ def check_and_fix_pytorch_version():
 
     except ImportError:
         print("⚠️  PyTorch not installed!")
-        print("   Installing PyTorch 2.8.0 + CUDA 12.8...\n")
+        print("   Installing PyTorch stack (torch 2.8.0 + torchvision + torchaudio)...\n")
 
         pip_cmd = get_pip_command_early()
         result = subprocess.run(
@@ -125,7 +132,8 @@ def check_and_fix_pytorch_version():
         )
 
         if result.returncode == 0:
-            print("\n✅ PyTorch 2.8.0 installed successfully!")
+            print("\n✅ PyTorch stack installed successfully!")
+            print("   torch==2.8.0 + compatible torchvision/torchaudio")
             return True
         else:
             print("\n⚠️  PyTorch installation failed")
@@ -205,13 +213,10 @@ def install_trellis_dependencies():
                 print(f"⚠️  Error installing {package}: {e}")
                 all_installed = False
 
-    print_subheader("ℹ️  Optional TRELLIS dependencies (install manually for best performance):")
-    print("   • flash-attn (10-20% faster): pip install flash-attn --no-build-isolation")
-    print("   • xformers (alternative): pip install xformers")
-    print("\n   Advanced (require compilation, version-specific):")
-    print("   • spconv (sparse convolution): See https://github.com/traveller59/spconv")
-    print("   • kaolin (3D ops): See https://github.com/NVIDIAGameWorks/kaolin")
-    print("   • nvdiffrast (rendering): See https://github.com/NVlabs/nvdiffrast")
+    print_subheader("ℹ️  Optional TRELLIS dependencies:")
+    print("   • xformers (alternative to flash-attn): pip install xformers")
+    print("\n   Note: The following are now auto-installed by install.py:")
+    print("   • flash-attn, spconv, kaolin, nvdiffrast, diffoctreerast, diff-gaussian-rasterization, vox2seq")
 
     return all_installed
 
@@ -580,6 +585,285 @@ def install_kaolin():
         return False
 
 
+def install_nvdiffrast():
+    """Install NVIDIA nvdiffrast for mesh rendering and texture baking"""
+    print_header("🎨 Installing NVIDIA nvdiffrast")
+
+    # Check if already installed
+    try:
+        import nvdiffrast
+        print("✅ nvdiffrast already installed")
+        return True
+    except ImportError:
+        pass
+
+    print("   nvdiffrast is required for mesh rendering and texture operations")
+    print("   Installing from source (requires CUDA)...\n")
+
+    # Check CUDA libraries
+    libs_available, missing = check_cuda_libraries()
+    if not libs_available:
+        print(f"⚠️  Missing CUDA libraries: {', '.join(missing)}")
+        print("   Skipping nvdiffrast installation")
+        return False
+
+    pip_cmd = get_pip_command_early()
+    result = subprocess.run(
+        pip_cmd + ["install", "git+https://github.com/NVlabs/nvdiffrast.git"],
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+        timeout=600
+    )
+
+    if result.returncode == 0:
+        print("\n✅ nvdiffrast installed successfully!")
+        return True
+    else:
+        print("\n⚠️  nvdiffrast installation failed")
+        print("   TRELLIS mesh rendering will be limited")
+        return False
+
+
+def install_diffoctreerast():
+    """Install diffoctreerast for octree rendering"""
+    print_header("🌳 Installing diffoctreerast")
+
+    # Check if already installed
+    try:
+        import diffoctreerast
+        print("✅ diffoctreerast already installed")
+        return True
+    except ImportError:
+        pass
+
+    print("   diffoctreerast is required for octree-based rendering")
+    print("   Installing from source (with submodules)...\n")
+
+    # Check CUDA libraries
+    libs_available, missing = check_cuda_libraries()
+    if not libs_available:
+        print(f"⚠️  Missing CUDA libraries: {', '.join(missing)}")
+        print("   Skipping diffoctreerast installation")
+        return False
+
+    pip_cmd = get_pip_command_early()
+    result = subprocess.run(
+        pip_cmd + ["install", "--no-build-isolation",
+                  "git+https://github.com/JeffreyXiang/diffoctreerast.git"],
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+        timeout=600
+    )
+
+    if result.returncode == 0:
+        print("\n✅ diffoctreerast installed successfully!")
+        return True
+    else:
+        print("\n⚠️  diffoctreerast installation failed")
+        print("   TRELLIS octree rendering will be limited")
+        return False
+
+
+def install_diff_gaussian_rasterization():
+    """Install diff-gaussian-rasterization for Gaussian splatting"""
+    print_header("💫 Installing diff-gaussian-rasterization")
+
+    # Check if already installed
+    try:
+        import diff_gaussian_rasterization
+        print("✅ diff-gaussian-rasterization already installed")
+        return True
+    except ImportError:
+        pass
+
+    print("   diff-gaussian-rasterization is required for Gaussian splatting rendering")
+    print("   Installing from mip-splatting submodule...\n")
+
+    # Check CUDA libraries
+    libs_available, missing = check_cuda_libraries()
+    if not libs_available:
+        print(f"⚠️  Missing CUDA libraries: {', '.join(missing)}")
+        print("   Skipping diff-gaussian-rasterization installation")
+        return False
+
+    pip_cmd = get_pip_command_early()
+    # Install from mip-splatting's submodule
+    # --no-build-isolation allows access to torch during build
+    result = subprocess.run(
+        pip_cmd + ["install", "--no-build-isolation",
+                  "git+https://github.com/autonomousvision/mip-splatting.git#subdirectory=submodules/diff-gaussian-rasterization"],
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+        timeout=600
+    )
+
+    if result.returncode == 0:
+        print("\n✅ diff-gaussian-rasterization installed successfully!")
+        return True
+    else:
+        print("\n⚠️  diff-gaussian-rasterization installation failed")
+        print("   TRELLIS Gaussian splatting will be limited")
+        return False
+
+
+def install_vox2seq(current_dir):
+    """Install vox2seq for sparse attention encoding"""
+    print_header("🔢 Installing vox2seq")
+
+    # Check if already installed
+    try:
+        import vox2seq
+        print("✅ vox2seq already installed")
+        return True
+    except ImportError:
+        pass
+
+    print("   vox2seq is required for sparse attention encoding")
+    print("   Installing from bundled extensions directory...\n")
+
+    # vox2seq is bundled in the MeshCraft repository
+    vox2seq_path = os.path.join(current_dir, "nodes", "lib", "extensions", "vox2seq")
+
+    if not os.path.exists(vox2seq_path):
+        print(f"⚠️  vox2seq not found at {vox2seq_path}")
+        print("   This may indicate the repository was not cloned properly")
+        print("   Please ensure all files were downloaded from the MeshCraft repository")
+        return False
+
+    pip_cmd = get_pip_command_early()
+    # --no-build-isolation allows access to torch during build
+    result = subprocess.run(
+        pip_cmd + ["install", "--no-build-isolation", vox2seq_path],
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+        timeout=300
+    )
+
+    if result.returncode == 0:
+        print("\n✅ vox2seq installed successfully!")
+        return True
+    else:
+        print("\n⚠️  vox2seq installation failed")
+        print("   TRELLIS sparse attention will be limited")
+        return False
+
+
+def install_flash_attn():
+    """Install flash-attn for faster attention computation"""
+    print_header("⚡ Installing flash-attn")
+
+    # Check if already installed
+    try:
+        import flash_attn
+        print(f"✅ flash-attn {flash_attn.__version__} already installed")
+        return True
+    except ImportError:
+        pass
+
+    print("   flash-attn provides 10-20% faster inference for TRELLIS")
+    print("   Installing from source (requires CUDA, takes 5-10 minutes)...\n")
+
+    # Check CUDA libraries
+    libs_available, missing = check_cuda_libraries()
+    if not libs_available:
+        print(f"⚠️  Missing CUDA libraries: {', '.join(missing)}")
+        print("   Skipping flash-attn installation")
+        return False
+
+    pip_cmd = get_pip_command_early()
+    # --no-build-isolation needed for CUDA extensions
+    result = subprocess.run(
+        pip_cmd + ["install", "--no-build-isolation", "flash-attn>=2.0.0"],
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+        timeout=900  # 15 minutes for compilation
+    )
+
+    if result.returncode == 0:
+        print("\n✅ flash-attn installed successfully!")
+        return True
+    else:
+        print("\n⚠️  flash-attn installation failed")
+        print("   TRELLIS may not work without it")
+        return False
+
+
+def install_spconv():
+    """Install spconv for sparse 3D convolutions"""
+    print_header("🔷 Installing spconv")
+
+    try:
+        import spconv.pytorch as spconv
+        print(f"✅ spconv {spconv.__version__} already installed")
+        return True
+    except ImportError:
+        pass
+
+    print("   spconv provides sparse 3D convolutions required by TRELLIS")
+    print("   Detecting CUDA version to install correct package...\n")
+
+    # Detect CUDA version
+    cuda_version = None
+    try:
+        result = subprocess.run(
+            ["nvcc", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        if result.returncode == 0:
+            import re
+            match = re.search(r'release (\d+)\.(\d+)', result.stdout)
+            if match:
+                cuda_major = int(match.group(1))
+                cuda_minor = int(match.group(2))
+                cuda_version = (cuda_major, cuda_minor)
+                print(f"   Detected CUDA {cuda_major}.{cuda_minor}")
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+
+    # Determine spconv package based on CUDA version
+    if cuda_version is None:
+        print("   ⚠️  Could not detect CUDA version, defaulting to cu120")
+        spconv_package = "spconv-cu120"
+    elif cuda_version >= (12, 6):
+        spconv_package = "spconv-cu126==2.3.8"
+        print(f"   Using spconv-cu126 (compatible with CUDA 12.6+)")
+    elif cuda_version >= (12, 4):
+        spconv_package = "spconv-cu124==2.3.8"
+        print(f"   Using spconv-cu124 (compatible with CUDA 12.4-12.5)")
+    elif cuda_version >= (12, 0):
+        spconv_package = "spconv-cu120"
+        print(f"   Using spconv-cu120 (compatible with CUDA 12.0-12.3)")
+    elif cuda_version >= (11, 8):
+        spconv_package = "spconv-cu118"
+        print(f"   Using spconv-cu118 (compatible with CUDA 11.8)")
+    elif cuda_version >= (11, 7):
+        spconv_package = "spconv-cu117"
+        print(f"   Using spconv-cu117 (compatible with CUDA 11.7)")
+    else:
+        print(f"   ⚠️  CUDA version {cuda_version[0]}.{cuda_version[1]} may not be supported")
+        spconv_package = "spconv-cu117"
+
+    print(f"   Installing {spconv_package}...\n")
+
+    pip_cmd = get_pip_command_early()
+    result = subprocess.run(
+        pip_cmd + ["install", spconv_package],
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+        timeout=300
+    )
+
+    if result.returncode == 0:
+        print("\n✅ spconv installed successfully!")
+        return True
+    else:
+        print("\n⚠️  spconv installation failed")
+        print("   TRELLIS requires spconv for sparse convolutions")
+        return False
+
+
 def install_blender():
     """Install Blender for RGB multiview rendering"""
     print_header("🔧 Installing Blender")
@@ -656,14 +940,6 @@ def main():
     print("This will install all dependencies and compile extensions.")
     print("This process may take 5-10 minutes depending on your system.\n")
 
-    # Check and fix PyTorch version FIRST (required for Kaolin)
-    if not check_and_fix_pytorch_version():
-        print("\n" + "="*80)
-        print("⚠️  Installation cannot continue without compatible PyTorch version")
-        print("   Please fix PyTorch installation and run this script again.")
-        print("="*80 + "\n")
-        sys.exit(1)
-
     # Get MeshCraft root directory
     # This script can be run from either root or scripts/ subdirectory
     script_path = os.path.abspath(__file__)
@@ -683,6 +959,15 @@ def main():
     # Install Python dependencies
     results['python_deps'] = install_python_dependencies(current_dir)
 
+    # Check and fix PyTorch version AFTER requirements.txt installation
+    # (requirements.txt may have installed incompatible versions)
+    if not check_and_fix_pytorch_version():
+        print("\n" + "="*80)
+        print("⚠️  Installation cannot continue without compatible PyTorch version")
+        print("   Please fix PyTorch installation and run this script again.")
+        print("="*80 + "\n")
+        sys.exit(1)
+
     # Install TRELLIS dependencies
     results['trellis_deps'] = install_trellis_dependencies()
 
@@ -701,6 +986,18 @@ def main():
     # Install Kaolin (required for TRELLIS)
     results['kaolin'] = install_kaolin()
 
+    # Install TRELLIS rendering dependencies
+    results['nvdiffrast'] = install_nvdiffrast()
+    results['diffoctreerast'] = install_diffoctreerast()
+    results['diff_gaussian_rast'] = install_diff_gaussian_rasterization()
+    results['vox2seq'] = install_vox2seq(current_dir)
+
+    # Install flash-attn (required for TRELLIS attention)
+    results['flash_attn'] = install_flash_attn()
+
+    # Install spconv (required for TRELLIS sparse convolutions)
+    results['spconv'] = install_spconv()
+
     # Print summary
     print_header("📊 Installation Summary")
 
@@ -713,8 +1010,17 @@ def main():
     print(f"{status_emoji[results['mesh_inpaint']]} Mesh inpaint processor")
     print(f"{status_emoji[results['blender']]} Blender")
     print(f"{status_emoji[results['kaolin']]} Kaolin (NVIDIA 3D library)")
+    print(f"{status_emoji[results['nvdiffrast']]} nvdiffrast (mesh rendering)")
+    print(f"{status_emoji[results['diffoctreerast']]} diffoctreerast (octree rendering)")
+    print(f"{status_emoji[results['diff_gaussian_rast']]} diff-gaussian-rasterization (Gaussian splatting)")
+    print(f"{status_emoji[results['vox2seq']]} vox2seq (sparse attention)")
+    print(f"{status_emoji[results['flash_attn']]} flash-attn (fast attention)")
+    print(f"{status_emoji[results['spconv']]} spconv (sparse convolution)")
 
-    all_critical = results['python_deps'] and results['trellis_deps'] and results['kaolin']
+    all_critical = (results['python_deps'] and results['trellis_deps'] and
+                    results['kaolin'] and results['nvdiffrast'] and
+                    results['diffoctreerast'] and results['diff_gaussian_rast'] and
+                    results['vox2seq'] and results['flash_attn'] and results['spconv'])
 
     if all_critical:
         print_header("✅ ComfyUI-MeshCraft Installation Complete!")

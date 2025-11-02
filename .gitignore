@@ -10,6 +10,7 @@ build/
 # Ignore all models directories (except source code)
 models/
 !lib/trellis/models/
+!nodes/lib/trellis/models/
 !lib/hy3dshape/hy3dshape/models/
 
 # Ignore model weight files everywhere

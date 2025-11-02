@@ -6,7 +6,7 @@ import torch
 import utils3d.torch
 from .components import StandardDatasetBase, TextConditionedMixin, ImageConditionedMixin
 from ..modules.sparse.basic import SparseTensor
-from .. import modules
+from .. import models
 from ..utils.render_utils import get_renderer
 from ..utils.dist_utils import read_file_dist
 from ..utils.data_utils import load_balanced_group_indices

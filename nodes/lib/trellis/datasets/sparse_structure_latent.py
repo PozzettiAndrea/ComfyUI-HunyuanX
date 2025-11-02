@@ -7,7 +7,7 @@ import utils3d
 from ..representations.octree import DfsOctree as Octree
 from ..renderers import OctreeRenderer
 from .components import StandardDatasetBase, TextConditionedMixin, ImageConditionedMixin
-from .. import modules
+from .. import models
 from ..utils.dist_utils import read_file_dist
 
 
