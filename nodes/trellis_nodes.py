@@ -105,9 +105,17 @@ class Load_CLIP_Trellis:
 
     @classmethod
     def INPUT_TYPES(cls):
+        available_models = folder_paths.get_filename_list("text_encoders")
+
+        # If no models found, provide auto-download option
+        if not available_models:
+            available_models = ["clip_l.safetensors"]
+
         return {
             "required": {
-                "clip_model": (folder_paths.get_filename_list("text_encoders"),),
+                "clip_model": (available_models, {
+                    "default": "clip_l.safetensors" if "clip_l.safetensors" in available_models else available_models[0]
+                }),
             }
         }
 
@@ -116,12 +124,67 @@ class Load_CLIP_Trellis:
     FUNCTION = "load_clip"
     CATEGORY = "Trellis/Loaders"
 
+    def _download_clip_model(self, clip_model):
+        """Download CLIP model from HuggingFace if not found locally"""
+        try:
+            from huggingface_hub import hf_hub_download
+            import shutil
+        except ImportError:
+            raise RuntimeError(
+                "huggingface_hub is not installed. Please install it:\n"
+                "pip install huggingface_hub"
+            )
+
+        # Use ComfyUI's official CLIP-L model
+        repo_id = "comfyanonymous/flux_text_encoders"
+        filename = "clip_l.safetensors"
+
+        print(f"📥 CLIP model not found locally, downloading from HuggingFace...")
+        print(f"   Repository: {repo_id}")
+        print(f"   File: {filename} (~246 MB)")
+        print(f"   This is a one-time download, please wait...")
+
+        try:
+            # Download to HuggingFace cache
+            downloaded_path = hf_hub_download(
+                repo_id=repo_id,
+                filename=filename,
+                repo_type="model"
+            )
+
+            # Copy to ComfyUI models/clip folder
+            clip_dir = os.path.join(folder_paths.models_dir, "clip")
+            os.makedirs(clip_dir, exist_ok=True)
+            local_path = os.path.join(clip_dir, filename)
+
+            print(f"📦 Copying to ComfyUI models directory...")
+            shutil.copy(downloaded_path, local_path)
+
+            print(f"✅ CLIP model downloaded successfully!")
+            print(f"   Saved to: {local_path}")
+
+            return local_path
+
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to download CLIP model from HuggingFace: {e}\n\n"
+                f"Manual download instructions:\n"
+                f"1. Download: https://huggingface.co/{repo_id}/resolve/main/{filename}\n"
+                f"2. Place in: {os.path.join(folder_paths.models_dir, 'clip')}\n"
+                f"3. Restart ComfyUI"
+            )
+
     def load_clip(self, clip_model):
         """Load CLIP model from models/text_encoders/ directory"""
         model_path = folder_paths.get_full_path("text_encoders", clip_model)
 
-        if not os.path.exists(model_path):
-            raise ValueError(f"CLIP model not found at: {model_path}")
+        # Auto-download if missing (get_full_path returns None when not found)
+        if model_path is None or not os.path.exists(model_path):
+            # Construct expected path for error message
+            search_dirs = folder_paths.get_folder_paths("text_encoders")
+            expected_path = os.path.join(search_dirs[0], clip_model) if search_dirs else "models/clip/"
+            print(f"⚠️  CLIP model not found at: {expected_path}")
+            model_path = self._download_clip_model(clip_model)
 
         print(f"Loading CLIP model from: {model_path}")
 
