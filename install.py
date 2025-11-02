@@ -34,6 +34,27 @@ def print_subheader(message):
     print("-"*80 + "\n")
 
 
+def get_pip_command_early():
+    """Get pip command, preferring uv if available for faster installs"""
+    try:
+        # Check if uv is available
+        result = subprocess.run(
+            [sys.executable, "-m", "uv", "--version"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=5
+        )
+        if result.returncode == 0:
+            uv_version = result.stdout.decode('utf-8', errors='ignore').strip()
+            print(f"✅ Using uv for faster package installation ({uv_version})")
+            return [sys.executable, "-m", "uv", "pip"]
+    except:
+        pass
+
+    # Fall back to regular pip
+    return [sys.executable, "-m", "pip"]
+
+
 def check_and_fix_pytorch_version():
     """Check PyTorch version and automatically upgrade/downgrade if needed"""
     print_header("🔍 Checking PyTorch Version")
@@ -67,11 +88,12 @@ def check_and_fix_pytorch_version():
         cuda_tag = f"cu{cuda_ver_short}"
 
         # Install PyTorch 2.8.0 (let pip auto-resolve compatible torchvision/torchaudio)
+        pip_cmd = get_pip_command_early()
         result = subprocess.run(
-            [sys.executable, "-m", "pip", "install",
-             "torch==2.8.0", "torchvision", "torchaudio",
-             "--extra-index-url", f"https://download.pytorch.org/whl/{cuda_tag}",
-             "--force-reinstall"],
+            pip_cmd + ["install",
+                      "torch==2.8.0", "torchvision", "torchaudio",
+                      "--extra-index-url", f"https://download.pytorch.org/whl/{cuda_tag}",
+                      "--force-reinstall"],
             stdout=sys.stdout,
             stderr=sys.stderr,
             timeout=600
@@ -92,10 +114,11 @@ def check_and_fix_pytorch_version():
         print("⚠️  PyTorch not installed!")
         print("   Installing PyTorch 2.8.0 + CUDA 12.8...\n")
 
+        pip_cmd = get_pip_command_early()
         result = subprocess.run(
-            [sys.executable, "-m", "pip", "install",
-             "torch==2.8.0", "torchvision", "torchaudio",
-             "--extra-index-url", "https://download.pytorch.org/whl/cu128"],
+            pip_cmd + ["install",
+                      "torch==2.8.0", "torchvision", "torchaudio",
+                      "--extra-index-url", "https://download.pytorch.org/whl/cu128"],
             stdout=sys.stdout,
             stderr=sys.stderr,
             timeout=600
@@ -124,8 +147,9 @@ def install_python_dependencies(current_dir):
         return True
 
     try:
+        pip_cmd = get_pip_command_early()
         result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "-r", requirements_txt],
+            pip_cmd + ["install", "-r", requirements_txt],
             stdout=sys.stdout,
             stderr=sys.stderr,
             timeout=300
@@ -163,8 +187,9 @@ def install_trellis_dependencies():
             print(f"   Installing {package}{version_spec or ''}...")
             try:
                 install_spec = f"{package}{version_spec}" if version_spec else package
+                pip_cmd = get_pip_command_early()
                 result = subprocess.run(
-                    [sys.executable, "-m", "pip", "install", install_spec],
+                    pip_cmd + ["install", install_spec],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     timeout=120
@@ -384,8 +409,9 @@ def compile_mesh_inpaint_processor(current_dir):
         print("✅ pybind11 already installed")
     except ImportError:
         print("   Installing pybind11...")
+        pip_cmd = get_pip_command_early()
         result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "pybind11"],
+            pip_cmd + ["install", "pybind11"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=60
@@ -493,9 +519,10 @@ def install_kaolin():
             print(f"\n   Trying: kaolin {kaolin_version} for torch {torch_ver} + {cuda_tag}...")
             print(f"   Wheel URL: {wheel_url}")
 
+            pip_cmd = get_pip_command_early()
             result = subprocess.run(
-                [sys.executable, "-m", "pip", "install", f"kaolin=={kaolin_version}",
-                 "-f", wheel_url, "--no-cache-dir"],
+                pip_cmd + ["install", f"kaolin=={kaolin_version}",
+                          "-f", wheel_url, "--no-cache-dir"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 timeout=600  # 10 minute timeout per attempt
@@ -522,9 +549,10 @@ def install_kaolin():
         print("\n⚠️  All prebuilt wheels failed. Attempting to install from source...")
         print("   This may take 10-30 minutes and requires build tools.\n")
 
+        pip_cmd = get_pip_command_early()
         result = subprocess.run(
-            [sys.executable, "-m", "pip", "install",
-             "git+https://github.com/NVIDIAGameWorks/kaolin.git@v0.18.0"],
+            pip_cmd + ["install",
+                      "git+https://github.com/NVIDIAGameWorks/kaolin.git@v0.18.0"],
             stdout=sys.stdout,
             stderr=sys.stderr,
             timeout=1800  # 30 minute timeout for source build
@@ -636,9 +664,19 @@ def main():
         print("="*80 + "\n")
         sys.exit(1)
 
-    # Get MeshCraft root directory (go up from scripts/)
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    current_dir = os.path.dirname(script_dir)  # Go up to MeshCraft root
+    # Get MeshCraft root directory
+    # This script can be run from either root or scripts/ subdirectory
+    script_path = os.path.abspath(__file__)
+    script_dir = os.path.dirname(script_path)
+
+    # If this script is in scripts/, go up one level
+    if os.path.basename(script_dir) == "scripts":
+        current_dir = os.path.dirname(script_dir)
+    else:
+        # Script is in root
+        current_dir = script_dir
+
+    print(f"📁 MeshCraft directory: {current_dir}\n")
 
     results = {}
 
