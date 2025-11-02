@@ -29,7 +29,7 @@ import shutil
 from typing import Union, Optional, Tuple, List, Any, Callable
 from pathlib import Path
 
-from ..utils.model_cache import get_cache_key, get_cached_model, cache_model, clear_cache, _MODEL_CACHE
+from .nodeutils.model_cache import get_cache_key, get_cached_model, cache_model, clear_cache, _MODEL_CACHE
 
 # ComfyUI imports (lightweight)
 import folder_paths
@@ -66,25 +66,25 @@ def _lazy_import(module_name):
             _LAZY_IMPORTS["PIL.ImageSequence"] = ImageSequence
             _LAZY_IMPORTS["PIL.ImageOps"] = ImageOps
         elif module_name == "hunyuan_pipeline":
-            from ..lib.hy3dshape.hy3dshape.pipelines import Hunyuan3DDiTFlowMatchingPipeline
+            from .lib.hy3dshape.hy3dshape.pipelines import Hunyuan3DDiTFlowMatchingPipeline
             _LAZY_IMPORTS["hunyuan_pipeline"] = Hunyuan3DDiTFlowMatchingPipeline
         elif module_name == "hunyuan_postprocessors":
-            from ..lib.hy3dshape.hy3dshape.postprocessors import FaceReducer, FloaterRemover, DegenerateFaceRemover
+            from .lib.hy3dshape.hy3dshape.postprocessors import FaceReducer, FloaterRemover, DegenerateFaceRemover
             _LAZY_IMPORTS["FaceReducer"] = FaceReducer
             _LAZY_IMPORTS["FloaterRemover"] = FloaterRemover
             _LAZY_IMPORTS["DegenerateFaceRemover"] = DegenerateFaceRemover
         elif module_name == "hunyuan_paint":
-            from ..lib.hy3dpaint.textureGenPipeline import Hunyuan3DPaintPipeline, Hunyuan3DPaintConfig
+            from .lib.hy3dpaint.textureGenPipeline import Hunyuan3DPaintPipeline, Hunyuan3DPaintConfig
             _LAZY_IMPORTS["Hunyuan3DPaintPipeline"] = Hunyuan3DPaintPipeline
             _LAZY_IMPORTS["Hunyuan3DPaintConfig"] = Hunyuan3DPaintConfig
         elif module_name == "hunyuan_vae":
-            from ..lib.hy3dshape.hy3dshape.models.autoencoders import ShapeVAE
+            from .lib.hy3dshape.hy3dshape.models.autoencoders import ShapeVAE
             _LAZY_IMPORTS["ShapeVAE"] = ShapeVAE
         elif module_name == "mesh_uv_wrap":
-            from ..lib.hy3dpaint.utils.uvwrap_utils import mesh_uv_wrap
+            from .lib.hy3dpaint.utils.uvwrap_utils import mesh_uv_wrap
             _LAZY_IMPORTS["mesh_uv_wrap"] = mesh_uv_wrap
         elif module_name == "meshlib":
-            from ..lib.hy3dshape.hy3dshape.meshlib import postprocessmesh
+            from .lib.hy3dshape.hy3dshape.meshlib import postprocessmesh
             _LAZY_IMPORTS["postprocessmesh"] = postprocessmesh
         elif module_name == "comfy_utils":
             from comfy.utils import load_torch_file, ProgressBar

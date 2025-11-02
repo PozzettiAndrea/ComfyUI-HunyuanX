@@ -12,9 +12,9 @@ from safetensors.torch import load_file
 from torchvision import transforms
 from PIL import Image
 
-from ..utils.trellis_utils import image_to_3d,prepare_output
-from ..lib.trellis.pipelines import TrellisImageTo3DPipeline,TrellisTextTo3DPipeline
-from ..utils.trellis_utils import glb2obj_,obj2fbx_,tensor2imglist,pre_img
+from .nodeutils.trellis_utils import image_to_3d,prepare_output
+from .lib.trellis.pipelines import TrellisImageTo3DPipeline,TrellisTextTo3DPipeline
+from .nodeutils.trellis_utils import glb2obj_,obj2fbx_,tensor2imglist,pre_img
 import folder_paths
 
 MAX_SEED = np.iinfo(np.int32).max
@@ -107,7 +107,7 @@ class Load_CLIP_Trellis:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "clip_model": (folder_paths.get_filename_list("clip"),),
+                "clip_model": (folder_paths.get_filename_list("text_encoders"),),
             }
         }
 
@@ -117,8 +117,8 @@ class Load_CLIP_Trellis:
     CATEGORY = "Trellis/Loaders"
 
     def load_clip(self, clip_model):
-        """Load CLIP model from models/clip/ directory"""
-        model_path = folder_paths.get_full_path("clip", clip_model)
+        """Load CLIP model from models/text_encoders/ directory"""
+        model_path = folder_paths.get_full_path("text_encoders", clip_model)
 
         if not os.path.exists(model_path):
             raise ValueError(f"CLIP model not found at: {model_path}")
@@ -128,7 +128,7 @@ class Load_CLIP_Trellis:
         # Load using the same method as trellis_text_to_3d.py
         # Note: This requires the clip/ config directory for tokenizer
         meshcraft_root = os.path.dirname(current_path)  # Go up from nodes/ to MeshCraft root
-        config_path = os.path.join(meshcraft_root, "lib", "clip")
+        config_path = os.path.join(meshcraft_root, "nodes", "lib", "clip")
 
         if not os.path.exists(config_path):
             raise ValueError(f"CLIP config directory not found at: {config_path}\nThis is needed for the tokenizer.")
@@ -898,7 +898,7 @@ class Trellis_Export_GLB:
 
     def export(self, gaussian, mesh, mesh_simplify, texture_size, texture_mode, filename):
         """Export gaussian and mesh to GLB file"""
-        from ..lib.trellis.utils import postprocessing_utils
+        from .lib.trellis.utils import postprocessing_utils
 
         trial_id = filename if filename else str(uuid.uuid4())
 
@@ -977,7 +977,7 @@ class Trellis_Render_Video:
     def render(self, representation, render_type, fps, filename):
         """Render video from 3D representation"""
         import imageio
-        from ..lib.trellis.utils import render_utils
+        from .lib.trellis.utils import render_utils
 
         trial_id = filename if filename else str(uuid.uuid4())
         video_path = f"{folder_paths.get_output_directory()}/{trial_id}.mp4"

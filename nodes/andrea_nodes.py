@@ -20,7 +20,7 @@ import trimesh as Trimesh
 import folder_paths
 import comfy.model_management as mm
 
-from ..utils.model_cache import get_cache_key, get_cached_model, cache_model
+from .nodeutils.model_cache import get_cache_key, get_cached_model, cache_model
 
 
 # =============================================================================
@@ -42,7 +42,7 @@ def _lazy_import(module_name):
             from PIL import Image
             _LAZY_IMPORTS["PIL.Image"] = Image
         elif module_name == "hunyuan_pipeline":
-            from ..lib.hy3dshape.hy3dshape.pipelines import Hunyuan3DDiTFlowMatchingPipeline
+            from .lib.hy3dshape.hy3dshape.pipelines import Hunyuan3DDiTFlowMatchingPipeline
             _LAZY_IMPORTS["hunyuan_pipeline"] = Hunyuan3DDiTFlowMatchingPipeline
         elif module_name == "comfy_utils":
             from comfy.utils import load_torch_file
@@ -815,7 +815,7 @@ class LoadHunyuanDiT:
         config_path = os.path.join(meshcraft_root, 'lib', 'hunyuan_configs', 'dit_config_2_1.yaml')
 
         import yaml
-        from ..lib.hy3dshape.hy3dshape.pipelines import instantiate_from_config
+        from .lib.hy3dshape.hy3dshape.pipelines import instantiate_from_config
 
         # Load config
         with open(config_path, 'r') as f:
@@ -966,7 +966,7 @@ class LoadHunyuanVAE:
         config_path = os.path.join(meshcraft_root, 'lib', 'hunyuan_configs', 'dit_config_2_1.yaml')
 
         import yaml
-        from ..lib.hy3dshape.hy3dshape.pipelines import instantiate_from_config
+        from .lib.hy3dshape.hy3dshape.pipelines import instantiate_from_config
 
         # Load config
         with open(config_path, 'r') as f:

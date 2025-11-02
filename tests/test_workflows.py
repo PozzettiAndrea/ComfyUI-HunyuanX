@@ -14,30 +14,28 @@ Total test cases: 18
 - hunyuan-i2m: 2 attention configs
 """
 
-from copy import deepcopy
 import json
 import os
 import pytest
 from pytest import fixture
-import subprocess
 import time
-import torch
 import uuid
 import websocket
 import urllib.request
 import urllib.parse
 from pathlib import Path
-from typing import Dict, Any, Tuple
+from typing import Dict, Any
 
-from utils import (
+from testutils import (
     convert_workflow_file,
     detect_workflow_model_type,
     apply_attention_config,
-    get_trellis_attention_configs,
-    get_hunyuan_attention_configs,
     format_config_id,
 )
+from testutils.config_loader import load_test_config
 
+import threading
+workflow_lock = threading.Lock()
 
 class ComfyClient:
     """Client for communicating with ComfyUI server via WebSocket and HTTP."""
@@ -49,7 +47,7 @@ class ComfyClient:
 
     def connect(
         self,
-        listen: str = '127.0.0.1',
+        listen: str = '0.0.0.0',
         port: int = 8188,
         client_id: str = None
     ):
@@ -59,6 +57,23 @@ class ComfyClient:
         ws = websocket.WebSocket()
         ws.connect(f"ws://{self.server_address}/ws?clientId={self.client_id}")
         self.ws = ws
+
+    def wait_for_registry_ready(self, timeout=300):
+        """Wait until ComfyUI-Manager registry is loaded."""
+        start = time.time()
+        while time.time() - start < timeout:
+            try:
+                with urllib.request.urlopen(f"http://{self.server_address}/extensions") as resp:
+                    data = json.loads(resp.read())
+                    # 'ComfyUI-Manager' should appear once the registry is ready
+                    if any("ComfyUI-Manager" in ext for ext in data):
+                        print("🟢 ComfyUI registry ready.")
+                        return
+            except Exception:
+                pass
+            print("⏳ Waiting for ComfyUI registry to load...")
+            time.sleep(5)
+        raise TimeoutError("ComfyUI registry never became ready.")
 
     def queue_prompt(self, prompt: Dict[str, Any]) -> Dict[str, Any]:
         """Queue a workflow for execution."""
@@ -111,6 +126,26 @@ class ComfyClient:
 
         return self.get_history(prompt_id)[prompt_id]
 
+    def wait_for_idle(self, poll_interval: float = 5.0, timeout: int = 600):
+        """
+        Wait until ComfyUI's queue is empty (no active jobs).
+        Uses /queue endpoint to check status.
+        """
+        start = time.time()
+        while True:
+            try:
+                with urllib.request.urlopen(f"http://{self.server_address}/queue") as resp:
+                    data = json.loads(resp.read())
+                    if not data.get("queue_running") and not data.get("queue_pending"):
+                        print("🟢 ComfyUI queue is idle.")
+                        break
+            except Exception:
+                pass
+    
+            if time.time() - start > timeout:
+                raise TimeoutError("Timed out waiting for ComfyUI to become idle.")
+            time.sleep(poll_interval)
+
     def execute_workflow(self, workflow: Dict[str, Any], timeout: int = 600) -> Dict[str, Any]:
         """
         Execute a workflow and wait for completion.
@@ -129,9 +164,20 @@ class ComfyClient:
         # Wait for completion
         history = self.wait_for_completion(prompt_id, timeout=timeout)
 
+        # 🧠 Wait for ComfyUI to fully finish before starting the next workflow
+        self.wait_for_idle(poll_interval=10, timeout=3600)
+
         # Extract output information
         outputs = history.get('outputs', {})
         output_files = []
+
+        # Debug output (only if no outputs found)
+        if not outputs:
+            import json
+            print(f"\n{'='*60}")
+            print(f"⚠️  WARNING: No outputs in history!")
+            print(f"History keys: {list(history.keys())}")
+            print(f"{'='*60}\n")
 
         for node_id, node_output in outputs.items():
             # Check for various output types
@@ -139,10 +185,29 @@ class ComfyClient:
                 for img in node_output['images']:
                     output_files.append(img.get('filename', f"node_{node_id}_image"))
 
-            if 'glb_path' in node_output:
-                # For nodes that output GLB paths (like Trellis_Export_GLB)
-                for path_data in node_output['glb_path']:
-                    output_files.append(path_data)
+            # Look for any output that contains file paths
+            # Common patterns: result, glb_path, ply_path, mesh_path, file_path, etc.
+            for key, value in node_output.items():
+                # Skip non-file outputs
+                if key in ['images', 'ui']:
+                    continue
+
+                # Check if this looks like a file path output
+                # Preview3D and similar nodes return files in 'result' key
+                if 'path' in key.lower() or 'file' in key.lower() or key == 'result':
+                    if isinstance(value, (list, tuple)):
+                        # Extract non-null values that look like file paths
+                        for v in value:
+                            if v is not None and isinstance(v, str) and len(v) > 0:
+                                output_files.append(str(v))
+                    elif isinstance(value, str) and len(value) > 0:
+                        output_files.append(value)
+
+        # Debug: Print details if no files were extracted
+        if outputs and not output_files:
+            import json
+            print(f"\n⚠️  WARNING: Outputs exist but no files extracted!")
+            print(f"Output structure: {json.dumps(outputs, indent=2, default=str)[:1000]}\n")
 
         return {
             'prompt_id': prompt_id,
@@ -154,33 +219,34 @@ class ComfyClient:
 
 @pytest.mark.meshcraft
 class TestMeshCraftWorkflows:
-    """Test suite for MeshCraft workflows with attention configuration variations."""
+    """
+    Test suite for MeshCraft workflows with attention configuration variations.
 
-    # Target workflows to test
-    TARGET_WORKFLOWS = ["trellis-i2m", "trellis-t2m", "hunyuan-i2m"]
+    Test cases are generated from YAML configuration files in tests/configs/.
+    """
 
-    @fixture(scope="class", autouse=True)
-    def _server(self, args_pytest):
-        """Start ComfyUI server for testing."""
-        print("\n🚀 Starting ComfyUI server...")
-
-        # Get path to ComfyUI root (3 levels up from tests directory)
-        comfyui_root = Path(__file__).parent.parent.parent.parent
-
-        p = subprocess.Popen([
-            'python', str(comfyui_root / 'main.py'),
-            '--output-directory', args_pytest["output_dir"],
-            '--listen', args_pytest["listen"],
-            '--port', str(args_pytest["port"]),
-        ], cwd=str(comfyui_root))
-        yield
-        print("\n🛑 Stopping ComfyUI server...")
-        p.kill()
-        torch.cuda.empty_cache()
-
-    def start_client(self, listen: str, port: int, retries: int = 10) -> ComfyClient:
+    @staticmethod
+    def check_server_running(listen: str = '0.0.0.0', port: int = 8188) -> bool:
         """
-        Start and connect ComfyUI client.
+        Check if ComfyUI server is running.
+
+        Args:
+            listen: Server IP address
+            port: Server port
+
+        Returns:
+            True if server is accessible, False otherwise
+        """
+        try:
+            url = f"http://{listen}:{port}/system_stats"
+            urllib.request.urlopen(url, timeout=2)
+            return True
+        except (urllib.error.URLError, TimeoutError):
+            return False
+
+    def start_client(self, listen: str, port: int, retries: int = 3) -> ComfyClient:
+        """
+        Connect to an already-running ComfyUI server.
 
         Args:
             listen: Server IP address
@@ -189,85 +255,49 @@ class TestMeshCraftWorkflows:
 
         Returns:
             Connected ComfyClient instance
+
+        Raises:
+            RuntimeError: If ComfyUI server is not running
         """
+        # First check if server is running at all
+        if not self.check_server_running(listen, port):
+            raise RuntimeError(
+                f"\n\n❌ ComfyUI server is not running at {listen}:{port}\n\n"
+                "Please start the ComfyUI server manually before running tests:\n"
+                f"  python main.py --listen {listen} --port {port}\n\n"
+                "Then run the tests in a separate terminal:\n"
+                "  ./run_tests.sh test_workflows.py -v -m meshcraft\n"
+            )
+
+        # Server is running, now connect WebSocket client
         client = ComfyClient()
 
         for i in range(retries):
-            time.sleep(4)
+            if i > 0:
+                time.sleep(2)
             try:
                 client.connect(listen=listen, port=port)
+                client.wait_for_registry_ready(timeout=300)
                 print(f"✅ Connected to ComfyUI server at {listen}:{port}")
                 return client
-            except ConnectionRefusedError as e:
+            except (ConnectionRefusedError, OSError) as e:
                 print(f"⚠️  Connection attempt {i+1}/{retries} failed: {e}")
                 if i == retries - 1:
-                    raise
+                    raise RuntimeError(
+                        f"Failed to connect WebSocket to {listen}:{port} after {retries} attempts"
+                    ) from e
 
         return client
 
     @fixture(scope="class")
-    def client(self, args_pytest, _server):
-        """Fixture providing connected ComfyUI client."""
+    def client(self, args_pytest):
+        """Fixture providing connected ComfyUI client (requires server already running)."""
         client = self.start_client(args_pytest["listen"], args_pytest["port"])
         yield client
         del client
 
-    @fixture(scope="class")
-    def test_workflows(self, meshcraft_workflows, load_workflow):
-        """
-        Load and convert all target MeshCraft workflows.
 
-        Returns:
-            Dict mapping workflow names to (workflow_dict, model_type) tuples
-        """
-        workflows = {}
-
-        for workflow_name in self.TARGET_WORKFLOWS:
-            if workflow_name not in meshcraft_workflows:
-                print(f"⚠️  Workflow '{workflow_name}' not found, skipping")
-                continue
-
-            workflow_path = meshcraft_workflows[workflow_name]
-            workflow_dict, _ = load_workflow(workflow_path)
-            model_type = detect_workflow_model_type(workflow_dict)
-
-            workflows[workflow_name] = (workflow_dict, model_type)
-            print(f"📄 Loaded workflow: {workflow_name} (model: {model_type})")
-
-        if not workflows:
-            pytest.skip("No target workflows found")
-
-        return workflows
-
-    def generate_test_cases(self, test_workflows):
-        """
-        Generate all test cases (workflow × attention config combinations).
-
-        Returns:
-            List of (workflow_name, workflow_dict, attention_config, test_id) tuples
-        """
-        test_cases = []
-
-        for workflow_name, (base_workflow, model_type) in test_workflows.items():
-            if model_type == "trellis":
-                configs = get_trellis_attention_configs()
-            elif model_type == "hunyuan":
-                configs = get_hunyuan_attention_configs()
-            else:
-                print(f"⚠️  Unknown model type '{model_type}' for {workflow_name}")
-                continue
-
-            for config in configs:
-                # Apply attention config to workflow
-                try:
-                    modified_workflow = apply_attention_config(base_workflow, config, inplace=False)
-                    test_id = format_config_id(config)
-                    test_cases.append((workflow_name, modified_workflow, config, test_id))
-                except ValueError as e:
-                    print(f"⚠️  Failed to apply {config} to {workflow_name}: {e}")
-
-        return test_cases
-
+    @pytest.mark.order("sequential")
     def test_workflow_with_attention_config(
         self,
         client,
@@ -275,42 +305,28 @@ class TestMeshCraftWorkflows:
         workflow,
         attention_config,
         test_id,
+        timeout,
         track_workflow_performance,
         performance_tracker,
     ):
-        """
-        Test a workflow with a specific attention configuration.
-
-        Args:
-            client: ComfyUI client
-            workflow_name: Name of the workflow
-            workflow: API-format workflow dict
-            attention_config: AttentionConfig object
-            test_id: Test identifier string
-            track_workflow_performance: Performance tracking fixture
-            performance_tracker: Performance tracker instance
-        """
         print(f"\n{'=' * 60}")
         print(f"Testing: {workflow_name} with {attention_config.name}")
+        print(f"Timeout: {timeout}s")
         print(f"{'=' * 60}")
+    
+        # 🚦 Absolute sequential guard
+        with workflow_lock:
+            with track_workflow_performance(
+                workflow_name=workflow_name,
+                attention_config=attention_config.name,
+                model_type=attention_config.model_type
+            ) as tracker:
+                result = client.execute_workflow(workflow, timeout=timeout)
+    
+                assert 'outputs' in result, "No outputs returned from workflow"
+                assert result['output_files'], "No output files generated"
+                tracker.add_outputs(result['output_files'])
 
-        with track_workflow_performance(
-            workflow_name=workflow_name,
-            attention_config=attention_config.name,
-            model_type=attention_config.model_type
-        ) as tracker:
-            # Execute workflow
-            result = client.execute_workflow(workflow, timeout=600)
-
-            # Validate outputs
-            assert 'outputs' in result, "No outputs returned from workflow"
-            assert result['output_files'], "No output files generated"
-
-            # Track output files
-            tracker.add_outputs(result['output_files'])
-
-            print(f"✅ Success! Generated {len(result['output_files'])} outputs")
-            print(f"   Outputs: {result['output_files'][:3]}...")  # Show first 3
 
     def test_generate_report(self, performance_tracker):
         """Generate final performance report after all tests complete."""
@@ -334,54 +350,69 @@ def pytest_generate_tests(metafunc):
     Dynamically generate test parameters for parametrized tests.
 
     This hook is called during test collection to generate the actual test cases.
+    Uses the YAML configuration file specified via --config option.
     """
     if "workflow" in metafunc.fixturenames:
-        # Get the test class instance to access test_workflows
-        if hasattr(metafunc, 'cls') and hasattr(metafunc.cls, 'test_workflows'):
-            # This is a bit of a hack - we need access to fixtures during collection
-            # For now, we'll generate test cases in a pytest hook
+        # Check if this is the workflow test function
+        if hasattr(metafunc, 'cls') and metafunc.cls == TestMeshCraftWorkflows:
+            # Load test configuration
+            config_path = metafunc.config.getoption("--config")
 
-            # Import here to avoid circular imports
-            from pathlib import Path
+            try:
+                config_loader = load_test_config(config_path)
+            except FileNotFoundError as e:
+                # Config file doesn't exist - provide helpful error
+                pytest.fail(
+                    f"{e}\n\n"
+                    f"Generate a config file with:\n"
+                    f"  cd tests && python generate_config.py\n"
+                )
+                return
 
             # Workflow directory is relative to this test file
             workflow_dir = Path(__file__).parent.parent / "workflows"
-            test_workflows_data = {}
 
-            for workflow_name in TestMeshCraftWorkflows.TARGET_WORKFLOWS:
+            # Generate test cases from config
+            test_cases = []
+
+            for workflow_config in config_loader.get_workflow_configs():
+                workflow_name = workflow_config.name
                 workflow_path = workflow_dir / f"{workflow_name}.json"
 
                 if not workflow_path.exists():
+                    print(f"⚠️  Workflow file not found: {workflow_path}")
                     continue
 
+                # Load and convert workflow
                 workflow_dict = convert_workflow_file(str(workflow_path))
-                model_type = detect_workflow_model_type(workflow_dict)
-                test_workflows_data[workflow_name] = (workflow_dict, model_type)
 
-            # Generate test cases
-            test_cases = []
-
-            for workflow_name, (base_workflow, model_type) in test_workflows_data.items():
-                if model_type == "trellis":
-                    configs = get_trellis_attention_configs()
-                elif model_type == "hunyuan":
-                    configs = get_hunyuan_attention_configs()
-                else:
-                    continue
-
-                for config in configs:
+                # Generate test cases for each attention config
+                for attention_config in workflow_config.attention_configs:
                     try:
-                        modified_workflow = apply_attention_config(base_workflow, config, inplace=False)
-                        test_id = format_config_id(config)
-                        test_cases.append((workflow_name, modified_workflow, config, test_id))
-                    except ValueError:
-                        pass
+                        modified_workflow = apply_attention_config(
+                            workflow_dict,
+                            attention_config,
+                            inplace=False
+                        )
+                        test_id = format_config_id(attention_config)
+                        test_cases.append((
+                            workflow_name,
+                            modified_workflow,
+                            attention_config,
+                            test_id,
+                            workflow_config.timeout,
+                        ))
+                    except ValueError as e:
+                        print(f"⚠️  Failed to apply {attention_config} to {workflow_name}: {e}")
+
+            if not test_cases:
+                pytest.skip("No test cases generated from config")
 
             # Parametrize the test
             metafunc.parametrize(
-                "workflow_name,workflow,attention_config,test_id",
+                "workflow_name,workflow,attention_config,test_id,timeout",
                 test_cases,
-                ids=[f"{wf}-{tid}" for wf, _, _, tid in test_cases]
+                ids=[f"{wf}-{tid}" for wf, _, _, tid, _ in test_cases]
             )
 
 

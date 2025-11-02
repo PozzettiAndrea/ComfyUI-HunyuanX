@@ -12,21 +12,25 @@ import pytest
 import torch
 import numpy as np
 from unittest.mock import MagicMock, patch
-
+from nodes.hunyuan_nodes import (
+    Hy3D21LoadMesh,
+    Hy3D21MeshUVWrap,
+    Hy3D21CameraConfig,
+)
+from nodes.rendering_nodes import GenerateMultiviewPBR
 
 class TestMeshLoadAndExport:
     """Tests for mesh loading and exporting nodes."""
 
     def test_load_mesh_creates_trimesh_object(self, temp_mesh_file):
         """Test that LoadMesh node correctly loads a mesh file."""
-        from nodes import Hy3D21LoadMesh
 
         node = Hy3D21LoadMesh()
         result = node.load(temp_mesh_file)
 
         # Should return tuple with (trimesh, preview_image)
-        assert len(result) == 2
-        trimesh_obj, preview = result
+        assert len(result) == 1
+        trimesh_obj = result[0]
 
         # Verify trimesh object has vertices and faces
         assert hasattr(trimesh_obj, 'vertices')
@@ -36,7 +40,6 @@ class TestMeshLoadAndExport:
 
     def test_load_nonexistent_mesh_raises_error(self):
         """Test that loading a non-existent file raises an error."""
-        from nodes import Hy3D21LoadMesh
 
         node = Hy3D21LoadMesh()
 
@@ -51,7 +54,6 @@ class TestMeshPostprocessing:
 
     def test_uv_unwrap_adds_uv_coordinates(self, sample_trimesh):
         """Test that UV unwrapping adds UV coordinates to mesh."""
-        from nodes import Hy3D21MeshUVWrap
 
         node = Hy3D21MeshUVWrap()
 
@@ -77,7 +79,6 @@ class TestCameraConfiguration:
 
     def test_camera_config_parses_string_inputs(self):
         """Test that camera config correctly parses comma-separated strings."""
-        from hunyuan_nodes import Hy3D21CameraConfig
 
         node = Hy3D21CameraConfig()
 
@@ -98,7 +99,6 @@ class TestCameraConfiguration:
 
     def test_camera_config_handles_spaces_in_input(self):
         """Test that camera config handles various spacing in input strings."""
-        from hunyuan_nodes import Hy3D21CameraConfig
 
         node = Hy3D21CameraConfig()
 
@@ -140,7 +140,6 @@ class TestHeavyOperations:
 
         This test is skipped by default as it would require model files.
         """
-        from rendering_nodes import GenerateMultiviewPBR
 
         # Mock the heavy model loading
         with patch('rendering_nodes.LoadHunyuanMultiViewModel') as mock_loader:

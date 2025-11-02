@@ -35,16 +35,16 @@ def _lazy_import(module_name):
             import trimesh as Trimesh
             _LAZY_IMPORTS["trimesh"] = Trimesh
         elif module_name == "MeshRender":
-            from ..lib.hy3dpaint.DifferentiableRenderer.MeshRender import MeshRender
+            from .lib.hy3dpaint.DifferentiableRenderer.MeshRender import MeshRender
             _LAZY_IMPORTS["MeshRender"] = MeshRender
         elif module_name == "multiviewDiffusionNet":
-            from ..lib.hy3dpaint.utils.multiview_utils import multiviewDiffusionNet
+            from .lib.hy3dpaint.utils.multiview_utils import multiviewDiffusionNet
             _LAZY_IMPORTS["multiviewDiffusionNet"] = multiviewDiffusionNet
         elif module_name == "Hunyuan3DPaintConfig":
-            from ..lib.hy3dpaint.textureGenPipeline import Hunyuan3DPaintConfig
+            from .lib.hy3dpaint.textureGenPipeline import Hunyuan3DPaintConfig
             _LAZY_IMPORTS["Hunyuan3DPaintConfig"] = Hunyuan3DPaintConfig
         elif module_name == "ViewProcessor":
-            from ..lib.hy3dpaint.utils.pipeline_utils import ViewProcessor
+            from .lib.hy3dpaint.utils.pipeline_utils import ViewProcessor
             _LAZY_IMPORTS["ViewProcessor"] = ViewProcessor
 
     return _LAZY_IMPORTS.get(module_name)
