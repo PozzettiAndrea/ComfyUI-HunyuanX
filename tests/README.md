@@ -1,262 +1,520 @@
-# ComfyUI-MeshCraft Tests
+# MeshCraft Workflow Automated Testing Guide
 
-This directory contains the test suite for ComfyUI-MeshCraft.
+## Overview
 
-## Quick Start
+This testing framework automatically tests ComfyUI-MeshCraft workflows with different attention configurations to validate functionality and measure performance.
 
-### Running Tests Locally
+### What Gets Tested
+
+**Workflows:**
+- `trellis-i2m.json` - Trellis image-to-3D workflow
+- `trellis-t2m.json` - Trellis text-to-3D workflow
+- `hunyuan-i2m.json` - Hunyuan3D image-to-3D workflow
+
+**Attention Configurations:**
+
+For **Trellis** workflows (8 combinations):
+- `attn_backend`: flash-attn, sdpa, naive, xformers
+- `spconv_algo`: auto, flash-native
+
+For **Hunyuan** workflows (2 combinations):
+- `attention_mode`: sdpa, sageattn
+
+**Total Test Cases: 18**
+- trellis-i2m: 8 tests
+- trellis-t2m: 8 tests
+- hunyuan-i2m: 2 tests
+
+### What Gets Measured
+
+- ✅ Workflow execution success/failure
+- ⏱️  Execution time per configuration
+- 💾 GPU memory usage (if available)
+- 📦 Output file generation
+- 📊 Performance comparison across configurations
+
+---
+
+## Prerequisites
+
+### 1. Install Test Dependencies
 
 ```bash
-# From the ComfyUI-MeshCraft directory
-cd /workspace/ComfyUI/custom_nodes/ComfyUI-MeshCraft
-
-# Install development dependencies
-pip install -r requirements-dev.txt
-
-# Run all tests
-pytest tests/ -v
-
-# Run with coverage report
-pytest tests/ -v --cov=. --cov-report=term-missing
-
-# Run only fast tests (skip slow model-loading tests)
-pytest tests/ -v -m "not slow"
-
-# Run specific test file
-pytest tests/test_basic_nodes.py -v
-
-# Run specific test
-pytest tests/test_basic_nodes.py::TestMeshPostprocessing::test_mesh_decimation_reduces_face_count -v
+pip install pytest websocket-client psutil pynvml
 ```
 
-## Test Structure
+### 2. Verify Workflow Files Exist
 
-```
-tests/
-├── __init__.py           # Test package init
-├── conftest.py           # Shared fixtures and test configuration
-├── test_basic_nodes.py   # Basic node functionality tests
-└── README.md             # This file
+```bash
+ls workflows/
+# Should show: trellis-i2m.json, trellis-t2m.json, hunyuan-i2m.json
 ```
 
-## Writing Tests
+### 3. Ensure Required Models Are Downloaded
 
-### Basic Test Pattern
+The workflows will attempt to download models automatically, but you can pre-download them:
+
+- **Trellis models:** Will auto-download on first run
+- **Hunyuan3D models:** Will auto-download on first run
+- **DinoV2 models:** Will auto-download on first run
+
+---
+
+## Running Tests
+
+### Quick Start - Run All Tests
+
+```bash
+# From ComfyUI-MeshCraft directory
+cd /workspace/Daxinzhuang-Pottery-Puzzle-Challenge/ComfyUI/custom_nodes/ComfyUI-MeshCraft
+
+# Run all MeshCraft workflow tests
+pytest tests/test_workflows.py -v -m meshcraft
+```
+
+### Run Specific Workflows
+
+```bash
+# Test only trellis-i2m workflow
+pytest tests/test_workflows.py -v -k "trellis-i2m"
+
+# Test only hunyuan workflows
+pytest tests/test_workflows.py -v -k "hunyuan"
+
+# Test only flash-attn configurations
+pytest tests/test_workflows.py -v -k "flash-attn"
+```
+
+### Run with Custom Settings
+
+```bash
+# Custom output directory
+pytest tests/test_workflows.py -v -m meshcraft \
+  --output_dir=/tmp/comfy_test_outputs
+
+# Custom workflow directory
+pytest tests/test_workflows.py -v -m meshcraft \
+  --workflow-dir=../workflows
+
+# Custom test results directory
+pytest tests/test_workflows.py -v -m meshcraft \
+  --test-results-dir=my_test_results
+```
+
+### Run with Different Server Settings
+
+```bash
+# Use custom port
+pytest tests/test_meshcraft_workflows.py -v -m meshcraft --port 8189
+
+# Listen on all interfaces
+pytest tests/test_meshcraft_workflows.py -v -m meshcraft --listen 0.0.0.0
+```
+
+---
+
+## Test Output
+
+### Console Output
+
+During test execution, you'll see:
+
+```
+================================ test session starts =================================
+collecting ... collected 18 items
+
+tests/test_meshcraft_workflows.py::TestMeshCraftWorkflows::test_workflow_with_attention_config[trellis-i2m-flash-attn-auto]
+============================================================
+Testing: trellis-i2m with flash-attn_auto
+============================================================
+✅ Success! Generated 3 outputs
+   Outputs: ['output_17186.glb', ...]
+PASSED
+
+tests/test_meshcraft_workflows.py::TestMeshCraftWorkflows::test_workflow_with_attention_config[trellis-i2m-flash-attn-flash-native]
+...
+```
+
+### Performance Report
+
+At the end of the test run, a summary is printed:
+
+```
+============================================================
+PERFORMANCE TEST SUMMARY
+============================================================
+Total Tests: 18
+Successful: 16
+Failed: 2
+Success Rate: 88.9%
+
+Timing:
+  Average Duration: 45.2s
+  Min Duration: 32.1s
+  Max Duration: 67.8s
+
+GPU Memory:
+  Average Usage: 12543 MB
+  Peak Usage: 15234 MB
+
+By Workflow:
+  trellis-i2m: 7/8 passed
+  trellis-t2m: 7/8 passed
+  hunyuan-i2m: 2/2 passed
+============================================================
+```
+
+### Generated Files
+
+After testing, you'll find:
+
+1. **Test Results:**
+   ```
+   test_results/
+   ├── performance_metrics_YYYYMMDD_HHMMSS.json
+   └── performance_metrics_YYYYMMDD_HHMMSS.csv
+   ```
+
+2. **Output Files:**
+   ```
+   tests/inference/samples/
+   ├── output_xxxxx.glb
+   ├── output_xxxxx.png
+   └── ...
+   ```
+
+---
+
+## Understanding Test Results
+
+### CSV Report Format
+
+The CSV report contains one row per test with columns:
+
+| Column | Description |
+|--------|-------------|
+| `workflow_name` | Name of the workflow (e.g., "trellis-i2m") |
+| `attention_config` | Attention configuration used |
+| `test_id` | Unique test identifier |
+| `start_time` | Test start timestamp (ISO 8601) |
+| `end_time` | Test end timestamp |
+| `duration_seconds` | Execution time in seconds |
+| `status` | "success" or "failed" |
+| `error_message` | Error details if failed |
+| `gpu_memory_mb` | Peak GPU memory usage (MB) |
+| `cpu_memory_mb` | CPU memory usage (MB) |
+| `num_outputs` | Number of output files generated |
+| `model_type` | "trellis" or "hunyuan" |
+
+### JSON Report Format
+
+```json
+{
+  "timestamp": "2025-11-02T12:00:00",
+  "total_tests": 18,
+  "successful_tests": 16,
+  "failed_tests": 2,
+  "metrics": [
+    {
+      "workflow_name": "trellis-i2m",
+      "attention_config": "flash-attn_flash-native",
+      "test_id": "trellis-flash-attn-flash-native",
+      "start_time": "2025-11-02T12:00:10",
+      "end_time": "2025-11-02T12:00:55",
+      "duration_seconds": 45.2,
+      "status": "success",
+      "gpu_memory_mb": 12543.5,
+      "num_outputs": 3,
+      ...
+    },
+    ...
+  ]
+}
+```
+
+---
+
+## Analyzing Results
+
+### Find Fastest Configuration
+
+```bash
+# Sort CSV by duration
+sort -t, -k6 -n test_results/performance_metrics_*.csv | head -5
+```
+
+### Find Configuration with Lowest Memory Usage
+
+```bash
+# Sort by GPU memory
+sort -t, -k9 -n test_results/performance_metrics_*.csv | grep success | head -5
+```
+
+### Compare Attention Backends
 
 ```python
-def test_your_feature(sample_trimesh):
-    """Test description."""
-    from nodes import YourNode
+import pandas as pd
 
-    node = YourNode()
-    result = node.process(sample_trimesh)
+# Load results
+df = pd.read_csv('test_results/performance_metrics_YYYYMMDD_HHMMSS.csv')
 
-    assert result is not None
-    # Add more assertions
+# Group by attention config
+summary = df.groupby('attention_config').agg({
+    'duration_seconds': ['mean', 'std'],
+    'gpu_memory_mb': ['mean', 'max'],
+    'status': lambda x: (x == 'success').sum()
+})
+
+print(summary)
 ```
 
-### Available Fixtures
-
-See `conftest.py` for all fixtures. Common ones:
-
-- `sample_trimesh` - A simple cube mesh for testing
-- `sample_image_tensor` - A random 512x512 image in ComfyUI format
-- `sample_pil_image` - A PIL Image for testing
-- `temp_mesh_file` - A temporary mesh file path
-- `sample_mesh_with_uvs` - A mesh with UV coordinates
-
-### Testing Patterns
-
-#### 1. Test Input Validation
-
-```python
-def test_negative_input_rejected(self, sample_trimesh):
-    """Test that negative values are rejected."""
-    from nodes import YourNode
-
-    node = YourNode()
-
-    with pytest.raises((ValueError, AssertionError)):
-        node.process(sample_trimesh, -100)
-```
-
-#### 2. Test Basic Functionality
-
-```python
-def test_process_returns_expected_shape(self, sample_trimesh):
-    """Test that processing returns expected output."""
-    from nodes import YourNode
-
-    node = YourNode()
-    result = node.process(sample_trimesh)
-
-    assert len(result) == 2  # Node returns (mesh, preview)
-    assert result[0] is not None
-```
-
-#### 3. Mock Heavy Operations
-
-```python
-@pytest.mark.skip(reason="Requires model files")
-def test_with_mocked_model(self):
-    """Test with mocked heavy model loading."""
-    from unittest.mock import patch, MagicMock
-
-    with patch('your_module.load_model') as mock_load:
-        mock_model = MagicMock()
-        mock_load.return_value = mock_model
-
-        # Your test code here
-```
-
-#### 4. Test Edge Cases
-
-```python
-def test_handles_empty_mesh(self):
-    """Test that node handles edge cases gracefully."""
-    import trimesh
-
-    from nodes import YourNode
-
-    # Create empty mesh
-    empty_mesh = trimesh.Trimesh()
-
-    node = YourNode()
-
-    # Should either handle gracefully or raise clear error
-    with pytest.raises(ValueError, match="empty"):
-        node.process(empty_mesh)
-```
-
-## Test Markers
-
-Use markers to categorize tests:
-
-- `@pytest.mark.slow` - Tests that take a long time (model loading, etc.)
-- `@pytest.mark.skip(reason="...")` - Tests to skip with reason
-- `@pytest.mark.gpu` - Tests that require GPU (for future)
-
-Run specific markers:
-```bash
-# Run only slow tests
-pytest tests/ -v -m "slow"
-
-# Skip slow tests
-pytest tests/ -v -m "not slow"
-```
-
-## CI/CD Integration
-
-Tests run automatically on GitHub Actions:
-
-- **On every push** to main/master
-- **On every pull request**
-- **Matrix testing**: Ubuntu, Windows, macOS × Python 3.10, 3.11, 3.12
-
-View results at: https://github.com/YOUR_USERNAME/ComfyUI-MeshCraft/actions
-
-### CI Test Jobs
-
-1. **test** - Runs pytest on all platforms/Python versions
-2. **lint** - Runs Ruff linting
-3. **test-import** - Verifies nodes can be imported
-
-## Best Practices
-
-### ✅ DO
-
-- Test public API (node INPUT_TYPES, FUNCTION methods)
-- Test edge cases (empty inputs, None values, boundary conditions)
-- Use fixtures for common test data
-- Mock heavy operations (model loading, GPU operations)
-- Write descriptive test names and docstrings
-- Keep tests fast (< 1s per test ideally)
-
-### ❌ DON'T
-
-- Test private implementation details
-- Require actual model files in tests
-- Require GPU for tests (use CPU only)
-- Make tests dependent on external services
-- Write tests that modify global state
-- Commit large test files (use fixtures instead)
-
-## Debugging Failed Tests
-
-### Verbose output
-```bash
-pytest tests/ -vv -s
-```
-
-### Run specific test with full traceback
-```bash
-pytest tests/test_basic_nodes.py::test_name -vv --tb=long
-```
-
-### Drop into debugger on failure
-```bash
-pytest tests/ --pdb
-```
-
-### See print statements
-```bash
-pytest tests/ -s
-```
-
-## Coverage
-
-Generate HTML coverage report:
-```bash
-pytest tests/ --cov=. --cov-report=html
-open htmlcov/index.html  # View in browser
-```
-
-Aim for:
-- **80%+ coverage** for critical paths
-- **100% coverage** for data processing functions
-- Don't obsess over 100% (diminishing returns)
-
-## Contributing
-
-When adding new nodes:
-
-1. **Add tests** for the new node in `test_basic_nodes.py` or a new test file
-2. **Run tests locally** before committing
-3. **Ensure CI passes** before merging PRs
-
-When modifying existing nodes:
-
-1. **Update tests** if behavior changes
-2. **Add regression tests** if fixing bugs
-3. **Verify coverage** doesn't decrease
+---
 
 ## Troubleshooting
 
-### Import errors in tests
+### Issue: Tests Hang or Timeout
 
-Make sure you're in the right directory:
+**Cause:** Workflow execution taking longer than 600s timeout
+
+**Solution:**
 ```bash
-cd /workspace/ComfyUI/custom_nodes/ComfyUI-MeshCraft
-pytest tests/
+# Increase timeout in test_meshcraft_workflows.py
+# Edit line: result = client.execute_workflow(workflow, timeout=1200)
 ```
 
-### Missing dependencies
+### Issue: CUDA Out of Memory
 
+**Cause:** GPU VRAM exhausted
+
+**Solutions:**
+1. Run tests one at a time:
+   ```bash
+   pytest tests/test_meshcraft_workflows.py -v -k "trellis-i2m-flash-attn-auto"
+   ```
+
+2. Reduce batch size in workflows (if applicable)
+
+3. Use CPU-only mode:
+   ```bash
+   pytest tests/test_meshcraft_workflows.py -v --cpu
+   ```
+
+### Issue: Connection Refused to Server
+
+**Cause:** Server not starting or port already in use
+
+**Solutions:**
+1. Check if port 8188 is already in use:
+   ```bash
+   lsof -i :8188
+   ```
+
+2. Use a different port:
+   ```bash
+   pytest tests/test_meshcraft_workflows.py --port 8189
+   ```
+
+3. Increase connection retry count in test
+
+### Issue: Workflow Not Found
+
+**Cause:** Workflow file missing or wrong directory
+
+**Solution:**
 ```bash
-pip install -r requirements-dev.txt
+# Verify workflow directory
+ls custom_nodes/ComfyUI-MeshCraft/workflows/
+
+# Or specify custom directory
+pytest tests/test_meshcraft_workflows.py \
+  --workflow-dir=/path/to/workflows
 ```
 
-### CUDA errors
+### Issue: Model Download Failures
 
-Tests should run on CPU only (handled by `use_cpu_only` fixture). If you see CUDA errors, check that the fixture is working.
+**Cause:** Network issues or insufficient disk space
 
-### Fixture not found
+**Solutions:**
+1. Pre-download models manually
+2. Check disk space: `df -h`
+3. Check internet connection
 
-Make sure `conftest.py` is in the tests directory and check fixture names match.
+---
 
-## Resources
+## Advanced Usage
 
-- [Pytest documentation](https://docs.pytest.org/)
-- [Pytest fixtures guide](https://docs.pytest.org/en/stable/fixture.html)
-- [ComfyUI test examples](../../tests-unit/)
-- [unittest.mock documentation](https://docs.python.org/3/library/unittest.mock.html)
+### Testing Custom Workflows
+
+1. Place your workflow JSON in the workflows directory:
+   ```bash
+   cp my_workflow.json custom_nodes/ComfyUI-MeshCraft/workflows/
+   ```
+
+2. Add workflow name to `TARGET_WORKFLOWS` in `test_meshcraft_workflows.py`:
+   ```python
+   TARGET_WORKFLOWS = ["trellis-i2m", "trellis-t2m", "hunyuan-i2m", "my_workflow"]
+   ```
+
+3. Run tests:
+   ```bash
+   pytest tests/test_meshcraft_workflows.py -v -k "my_workflow"
+   ```
+
+### Integrating with CI/CD
+
+Add to your GitHub Actions workflow:
+
+```yaml
+name: Test MeshCraft Workflows
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest websocket-client psutil
+
+      - name: Run MeshCraft workflow tests
+        run: |
+          cd ComfyUI
+          pytest tests/test_meshcraft_workflows.py -v -m meshcraft
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v2
+        with:
+          name: test-results
+          path: test_results/
+```
+
+---
+
+## Utility Scripts
+
+### Standalone Workflow Converter
+
+Convert a workflow file from UI format to API format:
+
+```bash
+python tests/utils/workflow_converter.py \
+  custom_nodes/ComfyUI-MeshCraft/workflows/trellis-i2m.json \
+  /tmp/trellis-i2m-api.json
+```
+
+### List Available Attention Configs
+
+```bash
+python tests/utils/attention_configs.py
+```
+
+Output:
+```
+=== Trellis Attention Configurations ===
+  flash-attn_auto: {'attn_backend': 'flash-attn', 'spconv_algo': 'auto'}
+  flash-attn_flash-native: {'attn_backend': 'flash-attn', 'spconv_algo': 'flash-native'}
+  ...
+
+Total Trellis configs: 8
+
+=== Hunyuan Attention Configurations ===
+  sdpa: {'attention_mode': 'sdpa'}
+  sageattn: {'attention_mode': 'sageattn'}
+
+Total Hunyuan configs: 2
+```
+
+### Generate Performance Report
+
+```bash
+python tests/utils/performance_tracker.py
+```
+
+---
+
+## Architecture
+
+### Components
+
+```
+tests/
+├── test_meshcraft_workflows.py   # Main test suite
+├── conftest.py                    # Pytest fixtures and configuration
+├── utils/
+│   ├── workflow_converter.py     # UI→API workflow conversion
+│   ├── attention_configs.py      # Attention config management
+│   └── performance_tracker.py    # Performance metrics tracking
+└── MESHCRAFT_TESTING_GUIDE.md    # This guide
+```
+
+### Test Flow
+
+```
+1. pytest collects tests
+   ↓
+2. pytest_generate_tests() creates 18 test cases
+   ↓
+3. Server starts (via _server fixture)
+   ↓
+4. Client connects (via client fixture)
+   ↓
+5. For each test case:
+   a. Load workflow
+   b. Apply attention config
+   c. Start performance tracking
+   d. Execute workflow
+   e. Validate outputs
+   f. Record metrics
+   ↓
+6. Server stops
+   ↓
+7. Generate final report
+```
+
+---
+
+## FAQ
+
+**Q: How long does the full test suite take?**
+A: Approximately 15-30 minutes depending on GPU speed and whether models need to be downloaded.
+
+**Q: Can I run tests in parallel?**
+A: Not recommended - workflows share GPU memory and may interfere with each other.
+
+**Q: How much disk space is needed?**
+A: ~50GB for models + ~5GB for test outputs.
+
+**Q: Can I test on CPU only?**
+A: Yes, but it will be much slower (2-5x).
+
+**Q: What if a test fails?**
+A: Check the error message in the console output and the CSV report's `error_message` column. Common issues are CUDA OOM, missing models, or workflow syntax errors.
+
+**Q: How do I add a new attention configuration?**
+A: Edit `tests/utils/attention_configs.py` and add to the `TRELLIS_ATTN_BACKENDS`, `TRELLIS_SPCONV_ALGOS`, or `HUNYUAN_ATTENTION_MODES` lists.
+
+---
+
+## Support
+
+For issues or questions:
+1. Check the Troubleshooting section above
+2. Review test output and error messages
+3. Check ComfyUI-MeshCraft documentation
+4. Open an issue on GitHub
+
+---
+
+## License
+
+Same as ComfyUI and ComfyUI-MeshCraft

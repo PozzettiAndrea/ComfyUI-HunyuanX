@@ -1,222 +1,192 @@
-"""
-Pytest configuration and shared fixtures for ComfyUI-MeshCraft tests.
-
-This file provides common test fixtures and setup for all tests.
-"""
-
+import os
+import json
 import pytest
-import torch
-import numpy as np
-from unittest.mock import MagicMock, patch
-from PIL import Image
+from pathlib import Path
+
+# Command line arguments for pytest
+def pytest_addoption(parser):
+    parser.addoption('--output_dir', action="store", default='output', help='Output directory for generated files')
+    parser.addoption("--listen", type=str, default="127.0.0.1", metavar="IP", nargs="?", const="0.0.0.0", help="Specify the IP address to listen on (default: 127.0.0.1)")
+    parser.addoption("--port", type=int, default=8188, help="Set the listen port.")
+    parser.addoption("--workflow-dir", type=str, default=None, help="Directory containing workflow JSON files to test (defaults to ../workflows relative to tests)")
+    parser.addoption("--test-results-dir", type=str, default="test_results", help="Directory to save test results and performance metrics")
 
 
-@pytest.fixture
-def mock_comfy_modules():
-    """
-    Mock ComfyUI modules to prevent CUDA initialization and import errors during testing.
+# This initializes args at the beginning of the test session
+@pytest.fixture(scope="session", autouse=True)
+def args_pytest(pytestconfig):
+    args = {}
+    args['output_dir'] = pytestconfig.getoption('output_dir')
+    args['listen'] = pytestconfig.getoption('listen')
+    args['port'] = pytestconfig.getoption('port')
 
-    Similar to how ComfyUI's own tests mock their modules.
-    """
-    mock_nodes = MagicMock()
-    mock_nodes.MAX_RESOLUTION = 16384
+    os.makedirs(args['output_dir'], exist_ok=True)
 
-    mock_server = MagicMock()
-    mock_folder_paths = MagicMock()
-
-    with patch.dict('sys.modules', {
-        'nodes': mock_nodes,
-        'server': mock_server,
-        'folder_paths': mock_folder_paths,
-    }):
-        yield
-
-
-@pytest.fixture
-def sample_trimesh():
-    """Create a simple test mesh (cube) for testing."""
-    try:
-        import trimesh
-        # Create a simple cube mesh
-        mesh = trimesh.creation.box(extents=[1.0, 1.0, 1.0])
-        return mesh
-    except ImportError:
-        pytest.skip("trimesh not installed")
-
-
-@pytest.fixture
-def sample_image_tensor():
-    """Create a sample image tensor in ComfyUI format (B, H, W, C)."""
-    # ComfyUI uses BHWC format with values in range [0, 1]
-    return torch.rand(1, 512, 512, 3)
-
-
-@pytest.fixture
-def sample_pil_image():
-    """Create a sample PIL image."""
-    # Create a 512x512 RGB image with random data
-    img_array = np.random.randint(0, 255, (512, 512, 3), dtype=np.uint8)
-    return Image.fromarray(img_array)
-
-
-@pytest.fixture
-def sample_mesh_with_uvs():
-    """Create a test mesh with UV coordinates."""
-    try:
-        import trimesh
-        # Create a box with UV coordinates
-        mesh = trimesh.creation.box(extents=[1.0, 1.0, 1.0])
-
-        # Add simple UV coordinates (normally would be unwrapped properly)
-        # For testing, just create placeholder UVs
-        num_vertices = len(mesh.vertices)
-        mesh.visual.uv = np.random.rand(num_vertices, 2)
-
-        return mesh
-    except ImportError:
-        pytest.skip("trimesh not installed")
-
-
-@pytest.fixture
-def temp_mesh_file(tmp_path):
-    """Create a temporary mesh file for I/O testing."""
-    import trimesh
-
-    # Create a simple mesh
-    mesh = trimesh.creation.box(extents=[1.0, 1.0, 1.0])
-
-    # Save to temporary file
-    mesh_path = tmp_path / "test_mesh.obj"
-    mesh.export(str(mesh_path))
-
-    return str(mesh_path)
-
-
-@pytest.fixture(autouse=True)
-def use_cpu_only():
-    """
-    Force all tests to use CPU, even if CUDA is available.
-
-    This prevents GPU memory issues and makes tests faster/more reproducible.
-    """
-    original_device = torch.cuda.is_available
-    torch.cuda.is_available = lambda: False
-    yield
-    torch.cuda.is_available = original_device
-
-
-# Helper functions for tests
-
-def create_test_mesh(vertices_count=8, faces_count=12):
-    """Helper to create a simple test mesh with specified complexity."""
-    import trimesh
-
-    if vertices_count == 8 and faces_count == 12:
-        # Default cube
-        return trimesh.creation.box(extents=[1.0, 1.0, 1.0])
-    else:
-        # Create a UV sphere with approximate vertex count
-        subdivisions = max(0, int(np.log2(vertices_count / 8)))
-        return trimesh.creation.icosphere(subdivisions=subdivisions)
-
-
-def tensor_to_pil(tensor):
-    """Convert ComfyUI tensor format (BHWC) to PIL Image."""
-    # Remove batch dimension and convert to numpy
-    img_np = tensor[0].numpy()
-    # Convert from [0, 1] to [0, 255]
-    img_np = (img_np * 255).clip(0, 255).astype(np.uint8)
-    return Image.fromarray(img_np)
-
-
-def pil_to_tensor(pil_image):
-    """Convert PIL Image to ComfyUI tensor format (BHWC)."""
-    img_np = np.array(pil_image).astype(np.float32) / 255.0
-    # Add batch dimension
-    return torch.from_numpy(img_np).unsqueeze(0)
+    return args
 
 
 # Workflow testing fixtures
 
-@pytest.fixture
-def workflow_test_image():
-    """
-    Path to a test image for workflow execution tests.
+@pytest.fixture(scope="session")
+def workflow_dir(pytestconfig):
+    """Get the directory containing workflow JSON files."""
+    workflow_dir_str = pytestconfig.getoption("workflow_dir")
 
-    Returns the path to a simple test image that can be used as input
-    to image-to-3D workflows.
-    """
-    # Create a simple test image if it doesn't exist
-    from pathlib import Path
-    test_image_path = Path(__file__).parent / "test_data" / "test_cube.png"
-
-    if not test_image_path.exists():
-        # Create test_data directory if needed
-        test_image_path.parent.mkdir(exist_ok=True)
-
-        # Create a simple 512x512 test image (white cube on black background)
-        img = Image.new('RGB', (512, 512), color='black')
-        # Draw a white square in the center
-        from PIL import ImageDraw
-        draw = ImageDraw.Draw(img)
-        draw.rectangle([156, 156, 356, 356], fill='white')
-        img.save(test_image_path)
-
-    return str(test_image_path)
+    if workflow_dir_str:
+        return Path(workflow_dir_str)
+    else:
+        # Default to ../workflows relative to tests directory
+        return Path(__file__).parent.parent / "workflows"
 
 
-@pytest.fixture
-def load_workflow_json():
-    """
-    Helper fixture to load workflow JSON files.
+@pytest.fixture(scope="session")
+def test_results_dir(pytestconfig):
+    """Get the directory for saving test results."""
+    results_dir_str = pytestconfig.getoption("test_results_dir")
+    results_dir = Path(results_dir_str)
+    results_dir.mkdir(parents=True, exist_ok=True)
+    return results_dir
 
-    Usage:
-        workflow = load_workflow_json("trellis-i2m.json")
-    """
-    import json
-    from pathlib import Path
 
-    def _load(workflow_name: str):
-        workflow_path = Path(__file__).parent.parent / "workflows" / workflow_name
-        with open(workflow_path) as f:
-            return json.load(f)
-
-    return _load
+@pytest.fixture(scope="session")
+def performance_tracker(test_results_dir):
+    """Create a performance tracker for the test session."""
+    from utils import PerformanceTracker
+    return PerformanceTracker(output_dir=test_results_dir)
 
 
 @pytest.fixture
-def modify_workflow_attention():
-    """
-    Helper fixture to modify attention mechanism settings in workflows.
+def load_workflow():
+    """Fixture factory for loading and converting workflow JSON files."""
+    from utils import convert_workflow_file
 
-    Usage:
-        modified = modify_workflow_attention(workflow, "xformers", "xformers-native")
-    """
-    import copy
-
-    def _modify(workflow: dict, sparse_attn: str, slat_attn: str):
+    def _load_workflow(workflow_path):
         """
-        Modify attention settings in Load_Trellis_Model nodes.
+        Load a workflow JSON and convert to API format if needed.
 
         Args:
-            workflow: Workflow dict to modify
-            sparse_attn: Value for sparse_attn_impl
-                        ("flash-attn", "xformers", "torch-native")
-            slat_attn: Value for slat_attn_impl
-                      ("flash-native", "xformers-native", etc.)
+            workflow_path: Path to workflow JSON file (str or Path)
 
         Returns:
-            Modified copy of workflow dict
+            Tuple of (workflow_dict, workflow_name)
         """
-        workflow_copy = copy.deepcopy(workflow)
+        workflow_path = Path(workflow_path)
 
-        for node in workflow_copy.get("nodes", []):
-            if node.get("type") == "Load_Trellis_Model":
-                # widgets_values: [model_type, sparse_attn_impl, slat_attn_impl]
-                if len(node.get("widgets_values", [])) >= 3:
-                    node["widgets_values"][1] = sparse_attn
-                    node["widgets_values"][2] = slat_attn
+        if not workflow_path.exists():
+            raise FileNotFoundError(f"Workflow not found: {workflow_path}")
 
-        return workflow_copy
+        # Convert to API format
+        workflow_dict = convert_workflow_file(str(workflow_path))
 
-    return _modify
+        # Extract workflow name from filename
+        workflow_name = workflow_path.stem
+
+        return workflow_dict, workflow_name
+
+    return _load_workflow
+
+
+@pytest.fixture
+def get_workflow_variants():
+    """Fixture factory for generating workflow variants with different attention configs."""
+    from utils import generate_workflow_variants, detect_workflow_model_type
+
+    def _get_variants(workflow_dict):
+        """
+        Generate all attention configuration variants for a workflow.
+
+        Args:
+            workflow_dict: API-format workflow dict
+
+        Returns:
+            List of (AttentionConfig, modified_workflow) tuples
+        """
+        model_type = detect_workflow_model_type(workflow_dict)
+        if model_type == "unknown":
+            return []
+
+        return generate_workflow_variants(workflow_dict, model_type)
+
+    return _get_variants
+
+
+@pytest.fixture(scope="session")
+def meshcraft_workflows(workflow_dir):
+    """
+    Load all MeshCraft workflow JSON files.
+
+    Returns:
+        Dict mapping workflow names to file paths
+    """
+    if not workflow_dir.exists():
+        pytest.skip(f"Workflow directory not found: {workflow_dir}")
+
+    workflows = {}
+    for json_file in workflow_dir.glob("*.json"):
+        workflows[json_file.stem] = json_file
+
+    if not workflows:
+        pytest.skip(f"No workflow JSON files found in {workflow_dir}")
+
+    return workflows
+
+
+@pytest.fixture
+def track_workflow_performance(performance_tracker):
+    """
+    Context manager fixture for tracking workflow execution performance.
+
+    Usage:
+        with track_workflow_performance(workflow_name, attention_config) as tracker:
+            # Run workflow
+            tracker.add_outputs(output_files)
+    """
+    import contextlib
+
+    @contextlib.contextmanager
+    def _track(workflow_name, attention_config, **metadata):
+        """
+        Track performance of workflow execution.
+
+        Args:
+            workflow_name: Name of the workflow
+            attention_config: Attention configuration string
+            **metadata: Additional metadata to track
+
+        Yields:
+            Tracker context with add_outputs method
+        """
+        class TrackerContext:
+            def __init__(self, tracker):
+                self.tracker = tracker
+                self.output_files = []
+
+            def add_outputs(self, files):
+                """Add output files to the tracker."""
+                if isinstance(files, (list, tuple)):
+                    self.output_files.extend(files)
+                else:
+                    self.output_files.append(files)
+
+        performance_tracker.start_test(
+            workflow_name=workflow_name,
+            attention_config=attention_config,
+            **metadata
+        )
+
+        context = TrackerContext(performance_tracker)
+
+        try:
+            yield context
+            performance_tracker.finish_test(
+                status="success",
+                output_files=context.output_files
+            )
+        except Exception as e:
+            performance_tracker.finish_test(
+                status="failed",
+                error_message=str(e)
+            )
+            raise
+
+    return _track

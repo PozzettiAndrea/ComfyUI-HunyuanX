@@ -1,277 +1,390 @@
 """
-Integration tests for ComfyUI-MeshCraft workflows.
+Automated testing suite for MeshCraft workflows with different attention configurations.
 
-These tests load saved workflow JSON files and test them with different attention
-mechanism configurations to ensure compatibility across attention implementations.
+This test suite:
+1. Loads all MeshCraft workflows (trellis-i2m, trellis-t2m, hunyuan-i2m)
+2. Tests each workflow with all possible attention configurations
+3. Tracks performance metrics (execution time, memory usage)
+4. Validates output generation
+5. Generates a test report
 
-Run with: pytest tests/test_workflows.py -v -m workflow
-GPU tests: pytest tests/test_workflows.py -v -m gpu
+Total test cases: 18
+- trellis-i2m: 8 attention configs
+- trellis-t2m: 8 attention configs
+- hunyuan-i2m: 2 attention configs
 """
 
-import pytest
+from copy import deepcopy
 import json
-import copy
+import os
+import pytest
+from pytest import fixture
+import subprocess
+import time
+import torch
+import uuid
+import websocket
+import urllib.request
+import urllib.parse
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, Any, Tuple
+
+from utils import (
+    convert_workflow_file,
+    detect_workflow_model_type,
+    apply_attention_config,
+    get_trellis_attention_configs,
+    get_hunyuan_attention_configs,
+    format_config_id,
+)
 
 
-class TestWorkflowStructure:
-    """Tests for workflow JSON structure and node configuration."""
+class ComfyClient:
+    """Client for communicating with ComfyUI server via WebSocket and HTTP."""
 
-    @pytest.fixture
-    def workflows_dir(self):
-        """Get path to workflows directory."""
-        return Path(__file__).parent.parent / "workflows"
+    def __init__(self):
+        self.client_id = None
+        self.server_address = None
+        self.ws = None
 
-    def test_workflows_directory_exists(self, workflows_dir):
-        """Verify workflows directory exists."""
-        assert workflows_dir.exists(), f"Workflows directory not found: {workflows_dir}"
-        assert workflows_dir.is_dir()
+    def connect(
+        self,
+        listen: str = '127.0.0.1',
+        port: int = 8188,
+        client_id: str = None
+    ):
+        """Connect to ComfyUI server."""
+        self.client_id = client_id or str(uuid.uuid4())
+        self.server_address = f"{listen}:{port}"
+        ws = websocket.WebSocket()
+        ws.connect(f"ws://{self.server_address}/ws?clientId={self.client_id}")
+        self.ws = ws
 
-    def test_all_workflow_files_valid_json(self, workflows_dir):
-        """Test that all workflow files are valid JSON."""
-        workflow_files = list(workflows_dir.glob("*.json"))
-        assert len(workflow_files) > 0, "No workflow files found"
+    def queue_prompt(self, prompt: Dict[str, Any]) -> Dict[str, Any]:
+        """Queue a workflow for execution."""
+        p = {"prompt": prompt, "client_id": self.client_id}
+        data = json.dumps(p).encode('utf-8')
+        req = urllib.request.Request(
+            f"http://{self.server_address}/prompt",
+            data=data,
+            headers={'Content-Type': 'application/json'}
+        )
+        response = urllib.request.urlopen(req)
+        return json.loads(response.read())
 
-        for workflow_file in workflow_files:
-            with open(workflow_file) as f:
-                data = json.load(f)
-                assert isinstance(data, dict), f"{workflow_file.name} is not a dict"
-                assert "nodes" in data, f"{workflow_file.name} missing 'nodes' key"
+    def get_history(self, prompt_id: str) -> Dict[str, Any]:
+        """Get execution history for a prompt."""
+        url = f"http://{self.server_address}/history/{prompt_id}"
+        with urllib.request.urlopen(url) as response:
+            return json.loads(response.read())
 
+    def wait_for_completion(self, prompt_id: str, timeout: int = 600) -> Dict[str, Any]:
+        """
+        Wait for a workflow to complete execution.
 
-class TestWorkflowNodeConfiguration:
-    """Tests for node configuration in workflows."""
+        Args:
+            prompt_id: The prompt ID to wait for
+            timeout: Maximum time to wait in seconds
 
-    @pytest.fixture
-    def load_workflow(self):
-        """Helper to load a workflow JSON file."""
-        def _load(workflow_name: str) -> Dict:
-            workflow_path = Path(__file__).parent.parent / "workflows" / workflow_name
-            with open(workflow_path) as f:
-                return json.load(f)
-        return _load
+        Returns:
+            Execution history dict
 
-    def test_trellis_i2m_has_required_nodes(self, load_workflow):
-        """Test that trellis-i2m.json has all required node types."""
-        workflow = load_workflow("trellis-i2m.json")
-        node_types = {node["type"] for node in workflow["nodes"]}
+        Raises:
+            TimeoutError: If execution doesn't complete within timeout
+        """
+        start_time = time.time()
 
-        required_nodes = {
-            "LoadImage",
-            "Load_Trellis_Model",
-            "Trellis_Image_Conditioning",
-            "Trellis_SparseStructure_Sampler",
-            "Trellis_SLAT_Sampler",
-            "Trellis_SLAT_Decoder",
-            "Trellis_Export_GLB",
+        while True:
+            if time.time() - start_time > timeout:
+                raise TimeoutError(f"Workflow execution timed out after {timeout}s")
+
+            out = self.ws.recv()
+            if isinstance(out, str):
+                message = json.loads(out)
+                if message['type'] == 'executing':
+                    data = message['data']
+                    if data['node'] is None and data['prompt_id'] == prompt_id:
+                        # Execution is done
+                        break
+
+            time.sleep(0.1)
+
+        return self.get_history(prompt_id)[prompt_id]
+
+    def execute_workflow(self, workflow: Dict[str, Any], timeout: int = 600) -> Dict[str, Any]:
+        """
+        Execute a workflow and wait for completion.
+
+        Args:
+            workflow: API-format workflow dict
+            timeout: Maximum execution time in seconds
+
+        Returns:
+            Dict with execution results and output information
+        """
+        # Queue the workflow
+        result = self.queue_prompt(workflow)
+        prompt_id = result['prompt_id']
+
+        # Wait for completion
+        history = self.wait_for_completion(prompt_id, timeout=timeout)
+
+        # Extract output information
+        outputs = history.get('outputs', {})
+        output_files = []
+
+        for node_id, node_output in outputs.items():
+            # Check for various output types
+            if 'images' in node_output:
+                for img in node_output['images']:
+                    output_files.append(img.get('filename', f"node_{node_id}_image"))
+
+            if 'glb_path' in node_output:
+                # For nodes that output GLB paths (like Trellis_Export_GLB)
+                for path_data in node_output['glb_path']:
+                    output_files.append(path_data)
+
+        return {
+            'prompt_id': prompt_id,
+            'history': history,
+            'outputs': outputs,
+            'output_files': output_files,
         }
 
-        missing_nodes = required_nodes - node_types
-        assert not missing_nodes, f"Missing required nodes: {missing_nodes}"
 
-    def test_trellis_t2m_has_required_nodes(self, load_workflow):
-        """Test that trellis-t2m.json has all required node types."""
-        workflow = load_workflow("trellis-t2m.json")
-        node_types = {node["type"] for node in workflow["nodes"]}
+@pytest.mark.meshcraft
+class TestMeshCraftWorkflows:
+    """Test suite for MeshCraft workflows with attention configuration variations."""
 
-        # Text-to-mesh uses text conditioning instead of image
-        assert "Load_Trellis_Model" in node_types
-        assert "Trellis_SparseStructure_Sampler" in node_types
-        assert "Trellis_SLAT_Sampler" in node_types
+    # Target workflows to test
+    TARGET_WORKFLOWS = ["trellis-i2m", "trellis-t2m", "hunyuan-i2m"]
 
+    @fixture(scope="class", autouse=True)
+    def _server(self, args_pytest):
+        """Start ComfyUI server for testing."""
+        print("\n🚀 Starting ComfyUI server...")
 
-@pytest.mark.workflow
-class TestAttentionMechanisms:
-    """Tests for different attention mechanism configurations."""
+        # Get path to ComfyUI root (3 levels up from tests directory)
+        comfyui_root = Path(__file__).parent.parent.parent.parent
 
-    @pytest.fixture
-    def load_workflow(self):
-        """Helper to load a workflow JSON file."""
-        def _load(workflow_name: str) -> Dict:
-            workflow_path = Path(__file__).parent.parent / "workflows" / workflow_name
-            with open(workflow_path) as f:
-                return json.load(f)
-        return _load
+        p = subprocess.Popen([
+            'python', str(comfyui_root / 'main.py'),
+            '--output-directory', args_pytest["output_dir"],
+            '--listen', args_pytest["listen"],
+            '--port', str(args_pytest["port"]),
+        ], cwd=str(comfyui_root))
+        yield
+        print("\n🛑 Stopping ComfyUI server...")
+        p.kill()
+        torch.cuda.empty_cache()
 
-    @pytest.fixture
-    def modify_attention_settings(self):
-        """Helper to modify attention settings in a workflow."""
-        def _modify(workflow: Dict, sparse_attn: str, slat_attn: str) -> Dict:
-            """
-            Modify attention settings in Load_Trellis_Model node.
+    def start_client(self, listen: str, port: int, retries: int = 10) -> ComfyClient:
+        """
+        Start and connect ComfyUI client.
 
-            Args:
-                workflow: Workflow dict to modify
-                sparse_attn: sparse_attn_impl value ("flash-attn", "xformers", "torch-native")
-                slat_attn: slat_attn_impl value ("flash-native", "xformers-native", etc.)
+        Args:
+            listen: Server IP address
+            port: Server port
+            retries: Number of connection retry attempts
 
-            Returns:
-                Modified workflow dict (copy)
-            """
-            workflow_copy = copy.deepcopy(workflow)
+        Returns:
+            Connected ComfyClient instance
+        """
+        client = ComfyClient()
 
-            for node in workflow_copy["nodes"]:
-                if node["type"] == "Load_Trellis_Model":
-                    # widgets_values format: [model_type, sparse_attn_impl, slat_attn_impl]
-                    node["widgets_values"][1] = sparse_attn
-                    node["widgets_values"][2] = slat_attn
+        for i in range(retries):
+            time.sleep(4)
+            try:
+                client.connect(listen=listen, port=port)
+                print(f"✅ Connected to ComfyUI server at {listen}:{port}")
+                return client
+            except ConnectionRefusedError as e:
+                print(f"⚠️  Connection attempt {i+1}/{retries} failed: {e}")
+                if i == retries - 1:
+                    raise
 
-            return workflow_copy
-        return _modify
+        return client
 
-    def test_find_trellis_model_nodes(self, load_workflow):
-        """Test that we can find and parse Load_Trellis_Model nodes."""
-        workflow = load_workflow("trellis-i2m.json")
+    @fixture(scope="class")
+    def client(self, args_pytest, _server):
+        """Fixture providing connected ComfyUI client."""
+        client = self.start_client(args_pytest["listen"], args_pytest["port"])
+        yield client
+        del client
 
-        model_nodes = [n for n in workflow["nodes"] if n["type"] == "Load_Trellis_Model"]
-        assert len(model_nodes) == 1, "Should have exactly one Load_Trellis_Model node"
+    @fixture(scope="class")
+    def test_workflows(self, meshcraft_workflows, load_workflow):
+        """
+        Load and convert all target MeshCraft workflows.
 
-        node = model_nodes[0]
-        assert "widgets_values" in node
-        assert len(node["widgets_values"]) >= 3, "Should have at least 3 widget values"
+        Returns:
+            Dict mapping workflow names to (workflow_dict, model_type) tuples
+        """
+        workflows = {}
 
-        model_type, sparse_attn, slat_attn = node["widgets_values"][:3]
-        assert model_type in ["image-to-3d", "text-to-3d"]
-        assert isinstance(sparse_attn, str)
-        assert isinstance(slat_attn, str)
+        for workflow_name in self.TARGET_WORKFLOWS:
+            if workflow_name not in meshcraft_workflows:
+                print(f"⚠️  Workflow '{workflow_name}' not found, skipping")
+                continue
 
-    @pytest.mark.parametrize("sparse_attn,slat_attn", [
-        ("flash-attn", "flash-native"),
-        ("xformers", "xformers-native"),
-        ("torch-native", "flash-native"),
-        ("flash-attn", "xformers-native"),
-    ])
-    def test_modify_attention_settings(self, load_workflow, modify_attention_settings,
-                                       sparse_attn, slat_attn):
-        """Test that attention settings can be modified correctly."""
-        workflow = load_workflow("trellis-i2m.json")
-        modified = modify_attention_settings(workflow, sparse_attn, slat_attn)
+            workflow_path = meshcraft_workflows[workflow_name]
+            workflow_dict, _ = load_workflow(workflow_path)
+            model_type = detect_workflow_model_type(workflow_dict)
 
-        # Verify original is unchanged
-        original_node = [n for n in workflow["nodes"] if n["type"] == "Load_Trellis_Model"][0]
-        modified_node = [n for n in modified["nodes"] if n["type"] == "Load_Trellis_Model"][0]
+            workflows[workflow_name] = (workflow_dict, model_type)
+            print(f"📄 Loaded workflow: {workflow_name} (model: {model_type})")
 
-        assert original_node["widgets_values"][1:3] != [sparse_attn, slat_attn]
-        assert modified_node["widgets_values"][1:3] == [sparse_attn, slat_attn]
+        if not workflows:
+            pytest.skip("No target workflows found")
 
-    def test_all_attention_combinations_valid(self, load_workflow, modify_attention_settings):
-        """Test that all attention combinations create valid workflow structures."""
-        workflow = load_workflow("trellis-i2m.json")
+        return workflows
 
-        attention_combinations = [
-            ("flash-attn", "flash-native"),
-            ("flash-attn", "flash-causal"),
-            ("xformers", "xformers-native"),
-            ("xformers", "xformers-causal"),
-            ("torch-native", "flash-native"),
-            ("torch-native", "xformers-native"),
-        ]
+    def generate_test_cases(self, test_workflows):
+        """
+        Generate all test cases (workflow × attention config combinations).
 
-        for sparse_attn, slat_attn in attention_combinations:
-            modified = modify_attention_settings(workflow, sparse_attn, slat_attn)
+        Returns:
+            List of (workflow_name, workflow_dict, attention_config, test_id) tuples
+        """
+        test_cases = []
 
-            # Verify workflow structure is still valid
-            assert "nodes" in modified
-            assert len(modified["nodes"]) == len(workflow["nodes"])
+        for workflow_name, (base_workflow, model_type) in test_workflows.items():
+            if model_type == "trellis":
+                configs = get_trellis_attention_configs()
+            elif model_type == "hunyuan":
+                configs = get_hunyuan_attention_configs()
+            else:
+                print(f"⚠️  Unknown model type '{model_type}' for {workflow_name}")
+                continue
 
-            # Verify attention settings were applied
-            model_node = [n for n in modified["nodes"] if n["type"] == "Load_Trellis_Model"][0]
-            assert model_node["widgets_values"][1] == sparse_attn
-            assert model_node["widgets_values"][2] == slat_attn
+            for config in configs:
+                # Apply attention config to workflow
+                try:
+                    modified_workflow = apply_attention_config(base_workflow, config, inplace=False)
+                    test_id = format_config_id(config)
+                    test_cases.append((workflow_name, modified_workflow, config, test_id))
+                except ValueError as e:
+                    print(f"⚠️  Failed to apply {config} to {workflow_name}: {e}")
 
+        return test_cases
 
-@pytest.mark.gpu
-@pytest.mark.slow
-class TestWorkflowExecution:
-    """
-    Integration tests that execute workflows (requires GPU and models).
-
-    These tests are marked as 'gpu' and 'slow' - they require:
-    - GPU hardware
-    - Downloaded TRELLIS models
-    - Significant execution time (30s+ per test)
-
-    Run only on GPU runners: pytest -m gpu
-    Skip slow tests: pytest -m "not slow"
-    """
-
-    @pytest.fixture
-    def sample_test_image_path(self, workflow_test_image):
-        """Get path to test image for workflow execution."""
-        # workflow_test_image fixture will be added to conftest.py
-        return workflow_test_image
-
-    @pytest.mark.skip(reason="Full workflow execution requires ComfyUI server - implement when needed")
-    @pytest.mark.parametrize("workflow_name,sparse_attn,slat_attn", [
-        ("trellis-i2m.json", "flash-attn", "flash-native"),
-        ("trellis-i2m.json", "xformers", "xformers-native"),
-    ])
-    def test_execute_workflow_with_attention_variant(
-        self, workflow_name, sparse_attn, slat_attn, sample_test_image_path
+    def test_workflow_with_attention_config(
+        self,
+        client,
+        workflow_name,
+        workflow,
+        attention_config,
+        test_id,
+        track_workflow_performance,
+        performance_tracker,
     ):
         """
-        Test executing workflow with different attention mechanisms.
+        Test a workflow with a specific attention configuration.
 
-        NOTE: This test is currently skipped as it requires implementing
-        workflow execution infrastructure. To enable:
-
-        1. Implement ComfyUI server startup in conftest.py
-        2. Implement workflow submission and execution helpers
-        3. Add output validation
-        4. Remove @pytest.mark.skip decorator
-
-        See test_workflows.py docstring for implementation patterns.
+        Args:
+            client: ComfyUI client
+            workflow_name: Name of the workflow
+            workflow: API-format workflow dict
+            attention_config: AttentionConfig object
+            test_id: Test identifier string
+            track_workflow_performance: Performance tracking fixture
+            performance_tracker: Performance tracker instance
         """
-        # Implementation sketch:
-        # 1. Load workflow JSON
-        # 2. Modify attention settings
-        # 3. Submit to ComfyUI execution queue
-        # 4. Wait for completion
-        # 5. Validate outputs (GLB file exists, size > 0, etc.)
-        pass
+        print(f"\n{'=' * 60}")
+        print(f"Testing: {workflow_name} with {attention_config.name}")
+        print(f"{'=' * 60}")
 
-    @pytest.mark.skip(reason="Implement after basic execution tests work")
-    def test_attention_variants_produce_similar_outputs(self):
-        """
-        Test that different attention mechanisms produce similar results.
+        with track_workflow_performance(
+            workflow_name=workflow_name,
+            attention_config=attention_config.name,
+            model_type=attention_config.model_type
+        ) as tracker:
+            # Execute workflow
+            result = client.execute_workflow(workflow, timeout=600)
 
-        Could check:
-        - Output mesh vertex counts are similar (±10%)
-        - Output file sizes are similar
-        - Execution times are within reasonable range
-        """
-        pass
+            # Validate outputs
+            assert 'outputs' in result, "No outputs returned from workflow"
+            assert result['output_files'], "No output files generated"
+
+            # Track output files
+            tracker.add_outputs(result['output_files'])
+
+            print(f"✅ Success! Generated {len(result['output_files'])} outputs")
+            print(f"   Outputs: {result['output_files'][:3]}...")  # Show first 3
+
+    def test_generate_report(self, performance_tracker):
+        """Generate final performance report after all tests complete."""
+        # This runs last due to test ordering
+        print("\n" + "=" * 60)
+        print("GENERATING FINAL REPORT")
+        print("=" * 60)
+
+        performance_tracker.print_summary()
+
+        # Save results
+        output_files = performance_tracker.save_results(format="both")
+
+        print(f"\n📊 Performance reports saved:")
+        for fmt, path in output_files.items():
+            print(f"   {fmt.upper()}: {path}")
 
 
-# Helper functions for future workflow execution tests
-
-def find_node_by_type(workflow: Dict, node_type: str) -> List[Dict]:
-    """Find all nodes of a given type in a workflow."""
-    return [node for node in workflow["nodes"] if node["type"] == node_type]
-
-
-def get_node_widget_values(workflow: Dict, node_type: str) -> Dict[int, List[Any]]:
-    """Get widget values for all nodes of a given type."""
-    nodes = find_node_by_type(workflow, node_type)
-    return {node["id"]: node.get("widgets_values", []) for node in nodes}
-
-
-def validate_workflow_connections(workflow: Dict) -> bool:
+def pytest_generate_tests(metafunc):
     """
-    Validate that all node connections in workflow are valid.
+    Dynamically generate test parameters for parametrized tests.
 
-    Returns:
-        True if all connections reference valid nodes, False otherwise
+    This hook is called during test collection to generate the actual test cases.
     """
-    node_ids = {node["id"] for node in workflow["nodes"]}
+    if "workflow" in metafunc.fixturenames:
+        # Get the test class instance to access test_workflows
+        if hasattr(metafunc, 'cls') and hasattr(metafunc.cls, 'test_workflows'):
+            # This is a bit of a hack - we need access to fixtures during collection
+            # For now, we'll generate test cases in a pytest hook
 
-    for node in workflow["nodes"]:
-        for input_socket in node.get("inputs", []):
-            link_id = input_socket.get("link")
-            if link_id is not None:
-                # Find the link in links array (if present)
-                # For now, just check that inputs are structured correctly
-                pass
+            # Import here to avoid circular imports
+            from pathlib import Path
 
-    return True
+            # Workflow directory is relative to this test file
+            workflow_dir = Path(__file__).parent.parent / "workflows"
+            test_workflows_data = {}
+
+            for workflow_name in TestMeshCraftWorkflows.TARGET_WORKFLOWS:
+                workflow_path = workflow_dir / f"{workflow_name}.json"
+
+                if not workflow_path.exists():
+                    continue
+
+                workflow_dict = convert_workflow_file(str(workflow_path))
+                model_type = detect_workflow_model_type(workflow_dict)
+                test_workflows_data[workflow_name] = (workflow_dict, model_type)
+
+            # Generate test cases
+            test_cases = []
+
+            for workflow_name, (base_workflow, model_type) in test_workflows_data.items():
+                if model_type == "trellis":
+                    configs = get_trellis_attention_configs()
+                elif model_type == "hunyuan":
+                    configs = get_hunyuan_attention_configs()
+                else:
+                    continue
+
+                for config in configs:
+                    try:
+                        modified_workflow = apply_attention_config(base_workflow, config, inplace=False)
+                        test_id = format_config_id(config)
+                        test_cases.append((workflow_name, modified_workflow, config, test_id))
+                    except ValueError:
+                        pass
+
+            # Parametrize the test
+            metafunc.parametrize(
+                "workflow_name,workflow,attention_config,test_id",
+                test_cases,
+                ids=[f"{wf}-{tid}" for wf, _, _, tid in test_cases]
+            )
+
+
+if __name__ == "__main__":
+    # Run tests with: pytest tests/test_workflows.py -v
+    print("Run with: pytest tests/test_workflows.py -v -m meshcraft")
