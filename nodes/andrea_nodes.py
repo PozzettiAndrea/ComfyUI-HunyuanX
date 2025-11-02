@@ -812,7 +812,7 @@ class LoadHunyuanDiT:
 
         script_directory = os.path.dirname(os.path.abspath(__file__))
         meshcraft_root = os.path.dirname(script_directory)  # Go up from nodes/ to MeshCraft root
-        config_path = os.path.join(meshcraft_root, 'lib', 'hunyuan_configs', 'dit_config_2_1.yaml')
+        config_path = os.path.join(meshcraft_root, 'nodes', 'lib', 'hunyuan_configs', 'dit_config_2_1.yaml')
 
         import yaml
         from .lib.hy3dshape.hy3dshape.pipelines import instantiate_from_config
@@ -963,7 +963,7 @@ class LoadHunyuanVAE:
 
         script_directory = os.path.dirname(os.path.abspath(__file__))
         meshcraft_root = os.path.dirname(script_directory)  # Go up from nodes/ to MeshCraft root
-        config_path = os.path.join(meshcraft_root, 'lib', 'hunyuan_configs', 'dit_config_2_1.yaml')
+        config_path = os.path.join(meshcraft_root, 'nodes', 'lib', 'hunyuan_configs', 'dit_config_2_1.yaml')
 
         import yaml
         from .lib.hy3dshape.hy3dshape.pipelines import instantiate_from_config

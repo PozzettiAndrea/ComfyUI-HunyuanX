@@ -244,8 +244,8 @@
         "cnr_id": "ComfyUI_TRELLIS"
       },
       "widgets_values": [
-        1658479066,
-        "randomize",
+        42,
+        "fixed",
         false,
         7.5,
         12,

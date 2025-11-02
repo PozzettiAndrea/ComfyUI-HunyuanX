@@ -163,7 +163,7 @@ def compile_cuda_extension():
 
     # Get path to custom_rasterizer setup.py
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    rasterizer_dir = os.path.join(current_dir, "lib", "hy3dpaint", "custom_rasterizer")
+    rasterizer_dir = os.path.join(current_dir, "nodes", "lib", "hy3dpaint", "custom_rasterizer")
     setup_py = os.path.join(rasterizer_dir, "setup.py")
 
     if not os.path.exists(setup_py):
@@ -310,7 +310,7 @@ def compile_mesh_inpaint_processor():
 
     # Check if already compiled
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    renderer_dir = os.path.join(current_dir, "lib", "hy3dpaint", "DifferentiableRenderer")
+    renderer_dir = os.path.join(current_dir, "nodes", "lib", "hy3dpaint", "DifferentiableRenderer")
 
     # Look for compiled .so file
     import glob
@@ -560,8 +560,8 @@ def install_trellis_dependencies():
                 all_installed = False
 
     # Check for TRELLIS package (directory check only - DO NOT import torch!)
-    trellis_path = os.path.join(os.path.dirname(__file__), "trellis", "TRELLIS")
-    trellis_pipeline_file = os.path.join(trellis_path, "trellis", "pipelines", "trellis_image_to_3d.py")
+    trellis_path = os.path.join(os.path.dirname(__file__), "nodes", "lib", "trellis")
+    trellis_pipeline_file = os.path.join(trellis_path, "pipelines", "trellis_image_to_3d.py")
 
     if os.path.exists(trellis_pipeline_file):
         print("✅ TRELLIS package found (local repository)")

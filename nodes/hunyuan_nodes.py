@@ -345,6 +345,11 @@ class Hy3DMeshGenerator:
     FUNCTION = "loadmodel"
     CATEGORY = "Hunyuan3D21Wrapper"
 
+    @classmethod
+    def IS_CHANGED(cls, model, processed_image, steps, guidance_scale, seed, attention_mode, use_cache):
+        """Force reload when attention mode changes"""
+        return f"{model}_{attention_mode}_{seed}"
+
     def loadmodel(self, model, image, steps, guidance_scale, seed, attention_mode, use_cache):
         torch = _lazy_import("torch")
         _lazy_import("hunyuan_pipeline")

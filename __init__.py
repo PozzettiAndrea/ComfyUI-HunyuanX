@@ -17,10 +17,10 @@ Repository: https://github.com/YOUR_USERNAME/ComfyUI-MeshCraft
 import sys
 import os
 
-# Add lib/ to sys.path so hy3dshape and hy3dpaint are importable as top-level modules
+# Add nodes/lib/ to sys.path so hy3dshape and hy3dpaint are importable as top-level modules
 # This allows YAML configs to reference them directly (e.g., hy3dshape.hy3dshape.models)
 current_dir = os.path.dirname(os.path.abspath(__file__))
-lib_path = os.path.join(current_dir, "lib")
+lib_path = os.path.join(current_dir, "nodes", "lib")
 if lib_path not in sys.path:
     sys.path.insert(0, lib_path)
 

@@ -168,6 +168,10 @@ class Load_Trellis_Model:
         "text-to-3d": "microsoft/TRELLIS-text-large"
     }
 
+    def __init__(self):
+        self.cached_pipeline = None
+        self.cached_config = None  # Store (model_type, attn_backend, spconv_algo)
+
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -183,8 +187,29 @@ class Load_Trellis_Model:
     FUNCTION = "load_trellis"
     CATEGORY = "Trellis/Loaders"
 
+    @classmethod
+    def IS_CHANGED(cls, model_type, attn_backend, spconv_algo):
+        """Force reload when attention config changes"""
+        return f"{model_type}_{attn_backend}_{spconv_algo}"
+
     def load_trellis(self, model_type, attn_backend, spconv_algo):
         """Load Trellis model from HuggingFace repository (automatic repo selection)"""
+
+        # Check if we can use cached pipeline
+        current_config = (model_type, attn_backend, spconv_algo)
+        if self.cached_pipeline is not None and self.cached_config == current_config:
+            pipeline_type = "text" if model_type == "text-to-3d" else "image"
+            print(f"⚡ Using cached Trellis {pipeline_type} pipeline ({attn_backend}, {spconv_algo})")
+            return ({"model": self.cached_pipeline, "type": pipeline_type},)
+
+        # Clear old cache if config changed
+        if self.cached_pipeline is not None:
+            print(f"🗑️ Clearing old Trellis pipeline from cache (config changed)")
+            del self.cached_pipeline
+            self.cached_pipeline = None
+            torch.cuda.empty_cache()
+            gc.collect()
+
         # Set environment variables for backend configuration
         # Options: flash-attn (uses flash-attention directly), sdpa (PyTorch native),
         #          naive (pure PyTorch), xformers (requires flash-attn <=2.8.2)
@@ -212,7 +237,11 @@ class Load_Trellis_Model:
             # Load base pipeline without initializing text_cond_model
             pipeline = TrellisTextTo3DPipeline.from_pretrained(repo, skip_cond_model=True)
 
-        print(f"✓ Trellis {pipeline_type} model loaded successfully from {repo}")
+        # Cache the loaded pipeline
+        self.cached_pipeline = pipeline
+        self.cached_config = current_config
+
+        print(f"✓ Trellis {pipeline_type} model loaded and cached")
         return ({"model": pipeline, "type": pipeline_type},)
 
 

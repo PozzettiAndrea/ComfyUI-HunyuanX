@@ -18,6 +18,7 @@ import json
 import os
 import pytest
 from pytest import fixture
+import shutil
 import time
 import uuid
 import websocket
@@ -146,13 +147,16 @@ class ComfyClient:
                 raise TimeoutError("Timed out waiting for ComfyUI to become idle.")
             time.sleep(poll_interval)
 
-    def execute_workflow(self, workflow: Dict[str, Any], timeout: int = 600) -> Dict[str, Any]:
+    def execute_workflow(self, workflow: Dict[str, Any], timeout: int = 600,
+                        workflow_name: str = None, attention_config_name: str = None) -> Dict[str, Any]:
         """
         Execute a workflow and wait for completion.
 
         Args:
             workflow: API-format workflow dict
             timeout: Maximum execution time in seconds
+            workflow_name: Name of the workflow being tested (for output naming)
+            attention_config_name: Attention config being tested (for output naming)
 
         Returns:
             Dict with execution results and output information
@@ -208,6 +212,21 @@ class ComfyClient:
             import json
             print(f"\n⚠️  WARNING: Outputs exist but no files extracted!")
             print(f"Output structure: {json.dumps(outputs, indent=2, default=str)[:1000]}\n")
+
+        # Copy outputs to test directory with descriptive names
+        if output_files and workflow_name and attention_config_name:
+            test_output_dir = Path(__file__).parent / "output"
+            test_output_dir.mkdir(exist_ok=True)
+
+            for output_file in output_files:
+                if isinstance(output_file, str) and output_file.endswith('.glb'):
+                    src = Path(output_file)
+                    if src.exists():
+                        # Create descriptive filename: workflow-name_config.glb
+                        test_name = f"{workflow_name}_{attention_config_name}.glb"
+                        dst = test_output_dir / test_name
+                        shutil.copy2(src, dst)
+                        print(f"📁 Copied output: {dst.name}")
 
         return {
             'prompt_id': prompt_id,
@@ -321,7 +340,12 @@ class TestMeshCraftWorkflows:
                 attention_config=attention_config.name,
                 model_type=attention_config.model_type
             ) as tracker:
-                result = client.execute_workflow(workflow, timeout=timeout)
+                result = client.execute_workflow(
+                    workflow,
+                    timeout=timeout,
+                    workflow_name=workflow_name,
+                    attention_config_name=attention_config.name
+                )
     
                 assert 'outputs' in result, "No outputs returned from workflow"
                 assert result['output_files'], "No output files generated"

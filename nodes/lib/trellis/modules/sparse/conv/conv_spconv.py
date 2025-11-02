@@ -9,11 +9,20 @@ class SparseConv3d(nn.Module):
         super(SparseConv3d, self).__init__()
         if 'spconv' not in globals():
             import spconv.pytorch as spconv
+
+        # Algorithm selection - force 'auto' to use 'Native' to prevent FP exceptions
         algo = None
         if SPCONV_ALGO == 'native':
             algo = spconv.ConvAlgo.Native
         elif SPCONV_ALGO == 'implicit_gemm':
             algo = spconv.ConvAlgo.MaskImplicitGemm
+        elif SPCONV_ALGO == 'auto':
+            # SAFETY: Force 'auto' to use Native algorithm to prevent floating point exceptions
+            # spconv's auto-selection can choose algorithms with numerical instability
+            algo = spconv.ConvAlgo.Native
+            if DEBUG:
+                print("[SPARSE][CONV] 'auto' mode using Native algorithm (prevents FP exceptions)")
+
         if stride == 1 and (padding is None):
             self.conv = spconv.SubMConv3d(in_channels, out_channels, kernel_size, dilation=dilation, bias=bias, indice_key=indice_key, algo=algo)
         else:
