@@ -748,14 +748,24 @@ class LoadHunyuanDiT:
         # Get list of local models
         local_models = folder_paths.get_filename_list("diffusion_models")
 
+        # Add expected local filenames so validation passes even if not downloaded yet
+        expected_files = [
+            "hunyuan3d-dit-v2-0-fp16.ckpt",
+            "hunyuan3d-dit-v2-1-fp16.ckpt",
+        ]
+
         # Add HuggingFace download options
         hf_models = [
             "tencent/Hunyuan3D-2 (fp16)",
             "tencent/Hunyuan3D-2.1 (fp16)",
         ]
 
-        # Combine: local models first, then HF options
-        all_models = local_models + hf_models
+        # Combine: local models first, expected files, then HF options
+        all_models = list(local_models) + expected_files + hf_models
+
+        # Remove duplicates while preserving order
+        seen = set()
+        all_models = [x for x in all_models if not (x in seen or seen.add(x))]
 
         return {
             "required": {
@@ -798,8 +808,33 @@ class LoadHunyuanDiT:
             else:
                 print(f"✓ Found local model: {local_filename}")
         else:
-            # Local model
+            # Local model - try to get full path
             model_path = folder_paths.get_full_path("diffusion_models", model)
+
+            # If None, file doesn't exist - check if it's a known model we can download
+            if model_path is None:
+                dit_dir = folder_paths.get_folder_paths("diffusion_models")[0]
+                expected_path = os.path.join(dit_dir, model)
+
+                # Check if this is one of the expected Hunyuan models we can auto-download
+                if model in ["hunyuan3d-dit-v2-1-fp16.ckpt", "hunyuan3d-dit-v2-0-fp16.ckpt"]:
+                    # Map to HuggingFace repo (include tencent/ prefix)
+                    if "v2-1" in model:
+                        hf_model = "tencent/Hunyuan3D-2.1"
+                    else:
+                        hf_model = "tencent/Hunyuan3D-2"
+
+                    print(f"📥 Downloading {hf_model} DiT from HuggingFace...")
+                    self._download_from_hf(hf_model, expected_path, "diffusion_models")
+                    model_path = expected_path
+                else:
+                    raise FileNotFoundError(
+                        f"DiT model not found: {model}\n"
+                        f"Expected location: {expected_path}\n"
+                        f"Please download the model or use HuggingFace format:\n"
+                        f"  - tencent/Hunyuan3D-2 (fp16)\n"
+                        f"  - tencent/Hunyuan3D-2.1 (fp16)"
+                    )
 
         cache_key = f"{model_path}_{attention_mode}"
 
@@ -902,14 +937,24 @@ class LoadHunyuanVAE:
         # Get list of local VAE models
         local_models = folder_paths.get_filename_list("vae")
 
+        # Add expected local filenames so validation passes even if not downloaded yet
+        expected_files = [
+            "Hunyuan3D-vae-v2-0-fp16.ckpt",
+            "Hunyuan3D-vae-v2-1-fp16.ckpt",
+        ]
+
         # Add HuggingFace download options
         hf_models = [
             "tencent/Hunyuan3D-2 VAE (fp16)",
             "tencent/Hunyuan3D-2.1 VAE (fp16)",
         ]
 
-        # Combine: local models first, then HF options
-        all_models = local_models + hf_models
+        # Combine: local models first, expected files, then HF options
+        all_models = list(local_models) + expected_files + hf_models
+
+        # Remove duplicates while preserving order
+        seen = set()
+        all_models = [x for x in all_models if not (x in seen or seen.add(x))]
 
         return {
             "required": {
@@ -951,8 +996,33 @@ class LoadHunyuanVAE:
             else:
                 print(f"✓ Found local VAE: {local_filename}")
         else:
-            # Local model
+            # Local model - try to get full path
             model_path = folder_paths.get_full_path("vae", model)
+
+            # If None, file doesn't exist - check if it's a known model we can download
+            if model_path is None:
+                vae_dir = folder_paths.get_folder_paths("vae")[0]
+                expected_path = os.path.join(vae_dir, model)
+
+                # Check if this is one of the expected Hunyuan models we can auto-download
+                if model in ["Hunyuan3D-vae-v2-1-fp16.ckpt", "Hunyuan3D-vae-v2-0-fp16.ckpt"]:
+                    # Map to HuggingFace repo (include tencent/ prefix)
+                    if "v2-1" in model:
+                        hf_model = "tencent/Hunyuan3D-2.1"
+                    else:
+                        hf_model = "tencent/Hunyuan3D-2"
+
+                    print(f"📥 Downloading {hf_model} VAE from HuggingFace...")
+                    self._download_from_hf(hf_model, expected_path)
+                    model_path = expected_path
+                else:
+                    raise FileNotFoundError(
+                        f"VAE model not found: {model}\n"
+                        f"Expected location: {expected_path}\n"
+                        f"Please download the model or use HuggingFace format:\n"
+                        f"  - tencent/Hunyuan3D-2 VAE (fp16)\n"
+                        f"  - tencent/Hunyuan3D-2.1 VAE (fp16)"
+                    )
 
         # Check if already loaded
         if use_cache and LoadHunyuanVAE._cached_vae is not None and LoadHunyuanVAE._cached_model_path == model_path:

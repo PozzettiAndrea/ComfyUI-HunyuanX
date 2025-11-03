@@ -1,6 +1,8 @@
 import sys
 import types
 import pytest
+import os
+import shutil
 from pathlib import Path
 
 # --- Add MeshCraft to sys.path ---
@@ -61,6 +63,50 @@ print("✅ Mocked comfy.*, folder_paths, node_helpers for pytest runtime")
 def comfy_mocks_loaded():
     """Ensures comfy mocks are loaded before any test."""
     return True
+
+# --- Setup test images ---
+@pytest.fixture(scope="session", autouse=True)
+def setup_test_images():
+    """Copy test images from examples/ to ComfyUI input/ folder before tests run"""
+    # Get paths
+    meshcraft_root = MESHCRAFT_DIR
+    examples_dir = meshcraft_root / "examples"
+
+    # ComfyUI input directory (3 levels up from MeshCraft: custom_nodes -> ComfyUI, then into input/)
+    comfyui_root = meshcraft_root.parent.parent
+    input_dir = comfyui_root / "input"
+
+    # Ensure input directory exists
+    input_dir.mkdir(parents=True, exist_ok=True)
+
+    # List of test images to copy
+    test_images = [
+        "typical_building_hunyuan.png",
+        "typical_building_trellis.png",
+    ]
+
+    print(f"\n📋 Copying test images from {examples_dir} to {input_dir}")
+
+    copied_files = []
+    for image_name in test_images:
+        src = examples_dir / image_name
+        dst = input_dir / image_name
+
+        if src.exists():
+            shutil.copy2(src, dst)
+            copied_files.append(dst)
+            print(f"  ✅ Copied: {image_name}")
+        else:
+            print(f"  ⚠️  Not found: {image_name}")
+
+    yield
+
+    # Optional: Clean up after tests complete
+    # Uncomment if you want to remove test images after tests finish
+    # for dst in copied_files:
+    #     if dst.exists():
+    #         dst.unlink()
+    #         print(f"  🗑️  Cleaned up: {dst.name}")
 
 def pytest_addoption(parser):
     parser.addoption(

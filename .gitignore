@@ -11,7 +11,7 @@ build/
 models/
 !lib/trellis/models/
 !nodes/lib/trellis/models/
-!lib/hy3dshape/hy3dshape/models/
+!nodes/lib/hy3dshape/hy3dshape/models/
 
 # Ignore model weight files everywhere
 *.pth
