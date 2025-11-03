@@ -1,0 +1,557 @@
+{
+  "id": "01347f90-5b61-479d-b49d-81714ba9452b",
+  "revision": 0,
+  "last_node_id": 24,
+  "last_link_id": 33,
+  "nodes": [
+    {
+      "id": 20,
+      "type": "Trellis_Export_GLB",
+      "pos": [
+        1010.7286949363396,
+        -108.93662213763194
+      ],
+      "size": [
+        270,
+        150
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "gaussian",
+          "type": "GAUSSIAN",
+          "link": 21
+        },
+        {
+          "name": "mesh",
+          "type": "MESH",
+          "link": 19
+        }
+      ],
+      "outputs": [
+        {
+          "name": "glb_path",
+          "type": "STRING",
+          "links": [
+            20
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
+        "ver": "a257bb6cbcd689333647efabb4314d5c7713c4e3",
+        "Node name for S&R": "Trellis_Export_GLB",
+        "cnr_id": "ComfyUI_TRELLIS"
+      },
+      "widgets_values": [
+        0.95,
+        1024,
+        "fast",
+        "output"
+      ]
+    },
+    {
+      "id": 16,
+      "type": "Trellis_SLAT_Sampler",
+      "pos": [
+        385.28285723193693,
+        -186.2620623237028
+      ],
+      "size": [
+        270,
+        194
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "trellis_model",
+          "type": "MODEL_TRELLIS",
+          "link": 12
+        },
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 33
+        },
+        {
+          "name": "sparse_coords",
+          "type": "COORDS",
+          "link": 24
+        }
+      ],
+      "outputs": [
+        {
+          "name": "slat",
+          "type": "SLAT",
+          "links": [
+            17
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
+        "ver": "a257bb6cbcd689333647efabb4314d5c7713c4e3",
+        "Node name for S&R": "Trellis_SLAT_Sampler",
+        "cnr_id": "ComfyUI_TRELLIS"
+      },
+      "widgets_values": [
+        3,
+        12,
+        0.5,
+        1,
+        3
+      ]
+    },
+    {
+      "id": 3,
+      "type": "Preview3D",
+      "pos": [
+        1376.18361666756,
+        -186.25135426626176
+      ],
+      "size": [
+        400,
+        550
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "camera_info",
+          "shape": 7,
+          "type": "LOAD3D_CAMERA",
+          "link": null
+        },
+        {
+          "name": "model_file",
+          "type": "STRING",
+          "widget": {
+            "name": "model_file"
+          },
+          "link": 20
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.67",
+        "Node name for S&R": "Preview3D",
+        "Camera Info": {
+          "position": {
+            "x": 9.684026767240125,
+            "y": 11.705410029178328,
+            "z": 7.126993838014617
+          },
+          "target": {
+            "x": 0,
+            "y": 2.5,
+            "z": 0
+          },
+          "zoom": 1,
+          "cameraType": "perspective"
+        },
+        "Last Time Model File": "/workspace/Daxinzhuang-Pottery-Puzzle-Challenge/ComfyUI/output/output_17186.glb",
+        "Resource Folder": "Daxinzhuang-Pottery-Puzzle-Challenge/ComfyUI/output"
+      },
+      "widgets_values": [
+        "/workspace/Daxinzhuang-Pottery-Puzzle-Challenge/ComfyUI/output/output_17186.glb",
+        ""
+      ]
+    },
+    {
+      "id": 4,
+      "type": "LoadImage",
+      "pos": [
+        -432.4978403308981,
+        327.59049705461797
+      ],
+      "size": [
+        274.080078125,
+        314
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            15
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.67",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "typical_building_trellis.png",
+        "image"
+      ]
+    },
+    {
+      "id": 21,
+      "type": "Trellis_SparseStructure_Sampler",
+      "pos": [
+        95.37593685035156,
+        94.94024757206371
+      ],
+      "size": [
+        310.99375,
+        198
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "trellis_model",
+          "type": "MODEL_TRELLIS",
+          "link": 23
+        },
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 32
+        }
+      ],
+      "outputs": [
+        {
+          "name": "sparse_coords",
+          "type": "COORDS",
+          "links": [
+            24
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
+        "ver": "a257bb6cbcd689333647efabb4314d5c7713c4e3",
+        "Node name for S&R": "Trellis_SparseStructure_Sampler",
+        "cnr_id": "ComfyUI_TRELLIS"
+      },
+      "widgets_values": [
+        42,
+        "fixed",
+        false,
+        7.5,
+        12,
+        1
+      ]
+    },
+    {
+      "id": 18,
+      "type": "Trellis_SLAT_Decoder",
+      "pos": [
+        694.5720543113397,
+        -248.67138776263207
+      ],
+      "size": [
+        284.76171875,
+        146
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "trellis_model",
+          "type": "MODEL_TRELLIS",
+          "link": 18
+        },
+        {
+          "name": "slat",
+          "type": "SLAT",
+          "link": 17
+        }
+      ],
+      "outputs": [
+        {
+          "name": "gaussian",
+          "type": "GAUSSIAN",
+          "links": [
+            21
+          ]
+        },
+        {
+          "name": "mesh",
+          "type": "MESH",
+          "links": [
+            19
+          ]
+        },
+        {
+          "name": "radiance_field",
+          "type": "RADIANCE_FIELD",
+          "links": null
+        }
+      ],
+      "properties": {
+        "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
+        "ver": "a257bb6cbcd689333647efabb4314d5c7713c4e3",
+        "Node name for S&R": "Trellis_SLAT_Decoder",
+        "cnr_id": "ComfyUI_TRELLIS"
+      },
+      "widgets_values": [
+        true,
+        true,
+        false
+      ]
+    },
+    {
+      "id": 14,
+      "type": "Load_Trellis_Model",
+      "pos": [
+        -666.9120358228637,
+        -64.57534298199808
+      ],
+      "size": [
+        270,
+        106
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "trellis_model",
+          "type": "MODEL_TRELLIS",
+          "links": [
+            12,
+            14,
+            18,
+            23
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
+        "ver": "a257bb6cbcd689333647efabb4314d5c7713c4e3",
+        "Node name for S&R": "Load_Trellis_Model",
+        "cnr_id": "ComfyUI_TRELLIS"
+      },
+      "widgets_values": [
+        "image-to-3d",
+        "flash-attn",
+        "flash-native"
+      ]
+    },
+    {
+      "id": 17,
+      "type": "Trellis_Image_Conditioning",
+      "pos": [
+        -140.31916113047905,
+        11.404339221742395
+      ],
+      "size": [
+        210.5591796875,
+        66
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "dinov2_model",
+          "type": "DINOV2",
+          "link": 13
+        },
+        {
+          "name": "trellis_model",
+          "type": "MODEL_TRELLIS",
+          "link": 14
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 15
+        }
+      ],
+      "outputs": [
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "links": [
+            32,
+            33
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
+        "ver": "a257bb6cbcd689333647efabb4314d5c7713c4e3",
+        "Node name for S&R": "Trellis_Image_Conditioning",
+        "cnr_id": "ComfyUI_TRELLIS"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 13,
+      "type": "Load_DinoV2_Model",
+      "pos": [
+        -496.16026302972796,
+        143.9623032411472
+      ],
+      "size": [
+        272.8970703125,
+        82
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "dinov2_model",
+          "type": "DINOV2",
+          "links": [
+            13
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
+        "ver": "a257bb6cbcd689333647efabb4314d5c7713c4e3",
+        "Node name for S&R": "Load_DinoV2_Model",
+        "cnr_id": "ComfyUI_TRELLIS"
+      },
+      "widgets_values": [
+        "dinov2_vitl14_reg",
+        "dinov2_vitl14_reg"
+      ]
+    }
+  ],
+  "links": [
+    [
+      12,
+      14,
+      0,
+      16,
+      0,
+      "MODEL_TRELLIS"
+    ],
+    [
+      13,
+      13,
+      0,
+      17,
+      0,
+      "DINOV2"
+    ],
+    [
+      14,
+      14,
+      0,
+      17,
+      1,
+      "MODEL_TRELLIS"
+    ],
+    [
+      15,
+      4,
+      0,
+      17,
+      2,
+      "IMAGE"
+    ],
+    [
+      17,
+      16,
+      0,
+      18,
+      1,
+      "SLAT"
+    ],
+    [
+      18,
+      14,
+      0,
+      18,
+      0,
+      "MODEL_TRELLIS"
+    ],
+    [
+      19,
+      18,
+      1,
+      20,
+      1,
+      "MESH"
+    ],
+    [
+      20,
+      20,
+      0,
+      3,
+      1,
+      "STRING"
+    ],
+    [
+      21,
+      18,
+      0,
+      20,
+      0,
+      "GAUSSIAN"
+    ],
+    [
+      23,
+      14,
+      0,
+      21,
+      0,
+      "MODEL_TRELLIS"
+    ],
+    [
+      24,
+      21,
+      0,
+      16,
+      2,
+      "COORDS"
+    ],
+    [
+      32,
+      17,
+      0,
+      21,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      33,
+      17,
+      0,
+      16,
+      1,
+      "CONDITIONING"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.543964613712546,
+      "offset": [
+        823.1984119823547,
+        429.421372417824
+      ]
+    },
+    "frontendVersion": "1.28.8"
+  },
+  "version": 0.4
+}

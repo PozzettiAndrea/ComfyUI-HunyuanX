@@ -1,0 +1,51 @@
+__pycache__/
+*.pyc
+*.pyo
+*.so
+*.o
+*.egg-info/
+build/
+*.ipynb_checkpoints/
+
+# Ignore all models directories (except source code)
+models/
+!lib/trellis/models/
+!nodes/lib/trellis/models/
+!nodes/lib/hy3dshape/hy3dshape/models/
+
+# Ignore model weight files everywhere
+*.pth
+*.pt
+*.ckpt
+*.safetensors
+*.bin
+*.weights
+*.h5
+*.onnx
+*.pb
+
+# Ignore training data
+*.npz
+
+# Test artifacts (keep directory structure, ignore generated files)
+tests/test_results/*.json
+tests/test_results/*.csv
+tests/output/**/*.glb
+tests/output/**/*.png
+tests/output/**/*.stl
+tests/output/**/*.obj
+tests/output/**/*.ply
+tests/output/**/*.mtl
+tests/output/**/*.jpg
+tests/output/**/*.jpeg
+# Ignore all test output directories (except .gitkeep markers)
+tests/output/*/
+!tests/output/.gitkeep
+
+# IDE configurations
+.claude/settings.local.json
+.vscode/settings.json
+
+# OS files
+.DS_Store
+Thumbs.db
