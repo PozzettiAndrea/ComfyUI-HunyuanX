@@ -5,8 +5,10 @@ torch>=2.5.0,<=2.8.0
 torchvision
 torchaudio
 
+# Rendering/remeshing dependencies
+pyglet<2
+pynanoinstantmeshes  # Fast mesh remeshing
 trimesh
-pyglet  # For trimesh headless rendering (scene.save_image)
 fast-simplification  # For high-quality mesh decimation (trimesh.simplify_quadric_decimation)
 pymeshlab
 pygltflib
@@ -49,16 +51,4 @@ git+https://github.com/EasternJournalist/utils3d.git@9a4eb15e4021b67b12c460c7057
 # Testing dependencies
 pytest>=8.0.0
 websocket-client>=1.0.0
-
-# REQUIRED: Kaolin (installed via install.py from NVIDIA S3 bucket)
-# kaolin==0.18.0 is installed by scripts/install.py from NVIDIA prebuilt wheels
-# For CUDA 12.8, requires torch 2.5.0-2.8.0 (specified above)
-
-# Optional TRELLIS performance dependencies (require compilation - install manually if needed)
-# flash-attn>=2.0.0  # 10-20% faster inference, takes 5-10 min to compile
-# xformers>=0.0.20  # Alternative to flash-attn
-# spconv-cu118  # Sparse convolution - match to your CUDA version
-# nvdiffrast  # Differentiable rendering
-
-# Optional mesh processing optimizations (has trimesh fallback if not installed)
-# pynanoinstantmeshes  # Fast mesh remeshing (falls back to trimesh decimation)
+dash

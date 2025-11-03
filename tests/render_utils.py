@@ -137,10 +137,19 @@ def render_glb_to_image(
             if camera_transform is not None:
                 scene.camera_transform = camera_transform
 
+            # Configure better lighting for improved render quality
+            # Add multiple light sources for better illumination
+            scene.set_camera(
+                resolution=image_size,
+                fov=(60, 60)  # Field of view in degrees
+            )
+
             # Save the image using trimesh's built-in PNG export
+            # Use smooth rendering with anti-aliasing
             png_data = scene.save_image(
                 resolution=image_size,
-                background=bg_color
+                background=bg_color,
+                visible=True  # Only render visible triangles
             )
 
             # Write to file

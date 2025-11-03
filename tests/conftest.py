@@ -123,16 +123,20 @@ import numpy as np
 
 @pytest.fixture
 def temp_mesh_file(tmp_path):
-    """Create a temporary .obj mesh file for testing."""
-    mesh = trimesh.creation.box(extents=(1, 1, 1))
+    """Create a temporary mesh file for testing."""
+    # Load Stanford Bunny from examples
+    bunny_path = MESHCRAFT_DIR / "examples" / "Stanford_Bunny.stl"
+    mesh = trimesh.load(bunny_path)
+    # Export to temp location
     mesh_path = tmp_path / "test_mesh.obj"
     mesh.export(mesh_path)
     return mesh_path
 
 @pytest.fixture
 def sample_trimesh():
-    """Provide a simple cube mesh for postprocessing tests."""
-    return trimesh.creation.box(extents=(1, 1, 1))
+    """Provide Stanford Bunny mesh for all tests."""
+    bunny_path = MESHCRAFT_DIR / "examples" / "Stanford_Bunny.stl"
+    return trimesh.load(bunny_path)
 
 @pytest.fixture
 def sample_camera_config():

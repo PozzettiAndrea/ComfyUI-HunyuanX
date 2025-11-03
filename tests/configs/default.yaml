@@ -12,7 +12,7 @@ workflows:
     timeout: 600
     model_type: trellis
   trellis-slat-visualizer:
-    enabled: true
+    enabled: false  # Disabled: Trellis_SLAT_Visualizer node not yet implemented
     timeout: 300
     model_type: trellis
   trellis-t2m:

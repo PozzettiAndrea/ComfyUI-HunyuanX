@@ -498,7 +498,7 @@ class RenderRGBMultiview:
             # Go up from nodes/ to MeshCraft root, then into utils/
             meshcraft_root = os_module.path.dirname(os_module.path.dirname(os_module.path.abspath(__file__)))
             script_path = os_module.path.join(
-                meshcraft_root, "utils", "blender_render_script.py"
+                meshcraft_root, "nodes", "nodeutils", "blender_render_script.py"
             )
 
             # Find Blender executable
@@ -552,13 +552,17 @@ class RenderRGBMultiview:
                 else:
                     img = Image.open(img_path)
 
-                    # Convert to RGB if needed
+                    # Handle alpha channel based on background color
                     if img.mode == 'RGBA' and background_color == "white":
-                        # Composite over white background
+                        # Composite over white background and convert to RGB
                         bg = Image.new('RGB', img.size, (255, 255, 255))
                         bg.paste(img, mask=img.split()[3])
                         img = bg
+                    elif img.mode == 'RGBA' and background_color == "transparent":
+                        # Keep RGBA for transparent backgrounds
+                        pass
                     else:
+                        # Convert to RGB for other cases
                         img = img.convert('RGB')
 
                     rendered_images.append(np.array(img))

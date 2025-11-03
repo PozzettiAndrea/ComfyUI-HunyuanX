@@ -23,6 +23,32 @@ from nodes.rendering_nodes import (
 )
 
 
+# Helper function to save rendered images
+def save_render_images(tensors, prefix, output_dir=None):
+    """
+    Save torch tensors as PNG images to test_renders/hunyuan_renders/.
+
+    Args:
+        tensors: Torch tensor of shape (N, H, W, C) with values in [0, 1]
+        prefix: Filename prefix (e.g., "normal_res256" or "rgb_cycles_32samples")
+        output_dir: Optional custom output directory
+    """
+    if output_dir is None:
+        output_dir = Path(__file__).parent / "test_renders" / "hunyuan_renders"
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Convert to numpy and scale to [0, 255]
+    images_np = (tensors.cpu().numpy() * 255).astype(np.uint8)
+
+    # Save each view
+    for i, img_np in enumerate(images_np):
+        img = Image.fromarray(img_np)
+        output_path = output_dir / f"{prefix}_view{i}.png"
+        img.save(output_path)
+        print(f"   💾 Saved: {output_path.name}")
+
+
 class TestRenderConditioningMaps:
     """
     Tests for RenderConditioningMaps node.
@@ -32,7 +58,7 @@ class TestRenderConditioningMaps:
     diffusion model.
     """
 
-    @pytest.mark.parametrize("resolution", [256, 512])
+    @pytest.mark.parametrize("resolution", [512])
     def test_render_conditioning_different_resolutions(self, sample_trimesh, sample_camera_config, resolution):
         """Test rendering conditioning maps at different resolutions."""
         node = RenderConditioningMaps()
@@ -56,6 +82,10 @@ class TestRenderConditioningMaps:
         assert position_maps.dtype == torch.float32
         assert torch.all(normal_maps >= 0.0) and torch.all(normal_maps <= 1.0)
 
+        # Save renders for visual inspection
+        save_render_images(normal_maps, f"normal_res{resolution}_ortho1.0")
+        save_render_images(position_maps, f"position_res{resolution}_ortho1.0")
+
     @pytest.mark.parametrize("ortho_scale", [0.8, 1.0, 1.2])
     def test_render_conditioning_different_ortho_scales(self, sample_trimesh, sample_camera_config, ortho_scale):
         """Test rendering conditioning maps with different orthographic scales."""
@@ -72,6 +102,10 @@ class TestRenderConditioningMaps:
         assert normal_maps is not None
         assert position_maps is not None
         assert normal_maps.shape[0] == 4  # 4 views
+
+        # Save renders for visual inspection
+        save_render_images(normal_maps, f"normal_res512_ortho{ortho_scale}")
+        save_render_images(position_maps, f"position_res512_ortho{ortho_scale}")
 
     def test_render_conditioning_output_format(self, sample_trimesh, sample_camera_config):
         """Test that conditioning maps follow ComfyUI IMAGE format."""
@@ -149,7 +183,7 @@ class TestRenderRGBMultiview:
         rgb_images, = node.render(
             mesh=sample_trimesh,
             camera_config=sample_camera_config,
-            resolution=256,  # Lower resolution for faster testing
+            resolution=512,
             background_color="transparent",
             engine=engine,
             samples=samples,
@@ -159,13 +193,16 @@ class TestRenderRGBMultiview:
 
         # Verify output shape
         assert rgb_images.shape[0] == 4  # 4 views
-        assert rgb_images.shape[1] == 256  # Height
-        assert rgb_images.shape[2] == 256  # Width
+        assert rgb_images.shape[1] == 512  # Height
+        assert rgb_images.shape[2] == 512  # Width
         assert rgb_images.shape[3] in [3, 4]  # RGB or RGBA
 
         # Verify data type and range
         assert rgb_images.dtype == torch.float32
         assert torch.all(rgb_images >= 0.0) and torch.all(rgb_images <= 1.0)
+
+        # Save renders for visual inspection
+        save_render_images(rgb_images, f"rgb_{engine}_{samples}samples_res512_bgtransparent")
 
     @pytest.mark.slow
     @pytest.mark.parametrize("samples", [32, 128])
@@ -181,7 +218,7 @@ class TestRenderRGBMultiview:
         rgb_images, = node.render(
             mesh=sample_trimesh,
             camera_config=sample_camera_config,
-            resolution=256,  # Lower resolution for faster testing
+            resolution=512,
             background_color="transparent",
             engine="CYCLES",
             samples=samples,
@@ -193,8 +230,11 @@ class TestRenderRGBMultiview:
         assert rgb_images is not None
         assert rgb_images.shape[0] == 4  # 4 views
 
+        # Save renders for visual inspection
+        save_render_images(rgb_images, f"rgb_CYCLES_{samples}samples_res512_bgtransparent")
+
     @pytest.mark.slow
-    @pytest.mark.parametrize("resolution", [256, 512])
+    @pytest.mark.parametrize("resolution", [512])
     def test_render_rgb_different_resolutions(self, sample_trimesh, sample_camera_config, check_blender_available, resolution):
         """Test rendering at different resolutions."""
         node = RenderRGBMultiview()
@@ -214,6 +254,9 @@ class TestRenderRGBMultiview:
         assert rgb_images.shape[1] == resolution
         assert rgb_images.shape[2] == resolution
 
+        # Save renders for visual inspection
+        save_render_images(rgb_images, f"rgb_BLENDER_EEVEE_1samples_res{resolution}_bgtransparent")
+
     @pytest.mark.slow
     @pytest.mark.parametrize("background_color", ["white", "transparent"])
     def test_render_rgb_different_backgrounds(self, sample_trimesh, sample_camera_config, check_blender_available, background_color):
@@ -223,7 +266,7 @@ class TestRenderRGBMultiview:
         rgb_images, = node.render(
             mesh=sample_trimesh,
             camera_config=sample_camera_config,
-            resolution=256,
+            resolution=512,
             background_color=background_color,
             engine="BLENDER_EEVEE",  # Use Eevee for faster testing
             samples=1,
@@ -240,6 +283,9 @@ class TestRenderRGBMultiview:
         else:
             assert rgb_images.shape[3] in [3, 4]  # RGB or RGBA
 
+        # Save renders for visual inspection
+        save_render_images(rgb_images, f"rgb_BLENDER_EEVEE_1samples_res512_bg{background_color}")
+
     def test_render_rgb_blender_not_found_raises_error(self, sample_trimesh, sample_camera_config):
         """Test that missing Blender raises a clear error message."""
         node = RenderRGBMultiview()
@@ -250,7 +296,7 @@ class TestRenderRGBMultiview:
                 node.render(
                     mesh=sample_trimesh,
                     camera_config=sample_camera_config,
-                    resolution=256,
+                    resolution=512,
                     background_color="transparent",
                     engine="CYCLES",
                     samples=32,

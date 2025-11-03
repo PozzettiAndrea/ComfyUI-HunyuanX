@@ -14,23 +14,26 @@ import trimesh
 
 
 def test_basic_rendering():
-    """Test rendering a simple cube mesh."""
+    """Test rendering Stanford Bunny mesh."""
     print("\n" + "="*60)
-    print("TEST 1: Basic Cube Rendering")
+    print("TEST 1: Basic Bunny Rendering")
     print("="*60)
 
-    # Create a test mesh (cube)
-    cube = trimesh.creation.box(extents=(1, 1, 1))
+    # Load Stanford Bunny from examples
+    meshcraft_dir = TESTS_DIR.parent
+    bunny_path = meshcraft_dir / "examples" / "Stanford_Bunny.stl"
 
-    # Save to temporary GLB file
-    test_glb = TESTS_DIR / "test_cube.glb"
-    cube.export(test_glb)
-    print(f"✅ Created test cube mesh: {test_glb}")
+    if not bunny_path.exists():
+        print(f"❌ Stanford Bunny not found at: {bunny_path}")
+        return False
+
+    print(f"✅ Loaded Stanford Bunny from: {bunny_path}")
 
     # Render it
-    output_path = TESTS_DIR / "test_cube_render.png"
+    output_path = TESTS_DIR / "test_renders" / "test_bunny_render.png"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     success = render_glb_to_image(
-        mesh_path=test_glb,
+        mesh_path=bunny_path,
         output_path=output_path,
         image_size=(800, 800),
         camera_position="isometric",
@@ -38,11 +41,11 @@ def test_basic_rendering():
     )
 
     if success and output_path.exists():
-        print(f"✅ Successfully rendered cube to: {output_path}")
+        print(f"✅ Successfully rendered bunny to: {output_path}")
         print(f"   File size: {output_path.stat().st_size / 1024:.1f} KB")
         return True
     else:
-        print(f"❌ Failed to render cube")
+        print(f"❌ Failed to render bunny")
         return False
 
 
@@ -52,18 +55,20 @@ def test_multiple_views():
     print("TEST 2: Multiple View Rendering")
     print("="*60)
 
-    # Create a test mesh (sphere)
-    sphere = trimesh.creation.icosphere(subdivisions=2)
+    # Load Stanford Bunny from examples
+    meshcraft_dir = TESTS_DIR.parent
+    bunny_path = meshcraft_dir / "examples" / "Stanford_Bunny.stl"
 
-    # Save to temporary GLB file
-    test_glb = TESTS_DIR / "test_sphere.glb"
-    sphere.export(test_glb)
-    print(f"✅ Created test sphere mesh: {test_glb}")
+    if not bunny_path.exists():
+        print(f"❌ Stanford Bunny not found at: {bunny_path}")
+        return False
+
+    print(f"✅ Loaded Stanford Bunny from: {bunny_path}")
 
     # Render multiple views
     output_dir = TESTS_DIR / "test_renders"
     rendered_files = render_multiple_views(
-        mesh_path=test_glb,
+        mesh_path=bunny_path,
         output_dir=output_dir,
         views=["isometric", "front", "side", "top"],
         image_size=(400, 400)
