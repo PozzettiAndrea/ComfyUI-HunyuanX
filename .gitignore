@@ -42,6 +42,15 @@ tests/output/**/*.jpeg
 tests/output/*/
 !tests/output/.gitkeep
 
+# Ignore test render outputs (screenshots from render_utils.py)
+tests/test_renders/**/*.png
+tests/test_renders/**/*.jpg
+tests/test_renders/**/*.jpeg
+
+# Ignore generated mesh files in tests directory
+tests/**/*.glb
+tests/**/*.stl
+
 # IDE configurations
 .claude/settings.local.json
 .vscode/settings.json

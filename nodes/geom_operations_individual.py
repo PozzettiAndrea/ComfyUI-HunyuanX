@@ -171,9 +171,11 @@ class MeshCraft_SmoothNormals:
 
     def process(self, trimesh: Trimesh) -> tuple:
         """Recalculate vertex normals for smooth shading."""
+        import trimesh as tm  # Import module to avoid shadowing by parameter name
+
         mesh = trimesh.copy()
 
-        mesh.vertex_normals = trimesh.smoothing.get_vertices_normals(mesh)
+        mesh.vertex_normals = tm.smoothing.get_vertices_normals(mesh)
 
         print(f"MeshCraft Smooth Normals: Recalculated normals for "
               f"{len(mesh.vertices)} vertices")
@@ -222,9 +224,12 @@ class MeshCraft_LaplacianSmooth:
 
     def process(self, trimesh: Trimesh, iterations: int, lambda_factor: float) -> tuple:
         """Apply Laplacian smoothing to mesh geometry."""
+        import trimesh as tm  # Import module to avoid shadowing by parameter name
+
         mesh = trimesh.copy()
 
-        result = trimesh.smoothing.filter_laplacian(
+        # filter_laplacian modifies mesh in-place
+        tm.smoothing.filter_laplacian(
             mesh,
             iterations=iterations,
             lamb=lambda_factor
@@ -233,7 +238,7 @@ class MeshCraft_LaplacianSmooth:
         print(f"MeshCraft Laplacian Smooth: Applied {iterations} iterations "
               f"(λ={lambda_factor:.2f}) to {len(mesh.vertices)} vertices")
 
-        return (result,)
+        return (mesh,)
 
 
 # ============================================================================
