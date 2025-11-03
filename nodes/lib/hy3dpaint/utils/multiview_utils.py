@@ -49,7 +49,7 @@ class multiviewDiffusionNet:
             print(f"   🔍 Checking for cached model...")
             model_path = huggingface_hub.snapshot_download(
                 repo_id=config.multiview_pretrained_path,
-                allow_patterns=["hunyuan3d-paintpbr-v2-1/*"],
+                allow_patterns=["hunyuan3d-paintpbr-v2-1/**"],
                 cache_dir=cache_dir,
                 local_files_only=True,  # Only use cache, no network
             )
@@ -59,7 +59,7 @@ class multiviewDiffusionNet:
             print(f"   📥 Downloading model from HuggingFace (first time)...")
             model_path = huggingface_hub.snapshot_download(
                 repo_id=config.multiview_pretrained_path,
-                allow_patterns=["hunyuan3d-paintpbr-v2-1/*"],
+                allow_patterns=["hunyuan3d-paintpbr-v2-1/**"],
                 cache_dir=cache_dir,
             )
 
