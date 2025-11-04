@@ -1039,8 +1039,34 @@ def reducefacesnano(new_mesh, max_facenum):
         print(f"Remeshed: {new_mesh.vertices.shape[0]} vertices, {new_mesh.faces.shape[0]} faces")
         return new_mesh
     except Exception as e:
-        print(f"Instant Meshes failed: {e}, returning original mesh")
-        return new_mesh
+        # Fallback to trimesh's built-in vertex clustering decimation
+        print(f"Instant Meshes not available ({e}), using trimesh clustering fallback...")
+
+        try:
+            # Calculate target edge length for clustering
+            # Estimate from bounding box and target face count
+            bounds_size = np.linalg.norm(new_mesh.bounds[1] - new_mesh.bounds[0])
+            # Rough estimate: edge_length ∝ sqrt(surface_area / face_count)
+            target_edge_length = bounds_size * np.sqrt(1.0 / max_facenum) * 2.0
+
+            # Use vertex clustering (simple, no dependencies)
+            clustered_mesh = new_mesh.simplify_vertex_clustering(
+                tolerance=target_edge_length
+            )
+
+            # If clustering didn't reduce enough, try a more aggressive tolerance
+            if len(clustered_mesh.faces) > max_facenum * 1.5:
+                target_edge_length *= 1.5
+                clustered_mesh = new_mesh.simplify_vertex_clustering(
+                    tolerance=target_edge_length
+                )
+
+            print(f"Clustered: {clustered_mesh.vertices.shape[0]} vertices, {clustered_mesh.faces.shape[0]} faces")
+            return clustered_mesh
+
+        except Exception as fallback_error:
+            print(f"Fallback decimation also failed: {fallback_error}, returning original mesh")
+            return new_mesh
 
 
 

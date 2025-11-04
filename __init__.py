@@ -38,6 +38,8 @@ from .nodes import (
     RENDERING_DISPLAY,
     TRELLIS_NODES,
     TRELLIS_DISPLAY,
+    GEOMOPS_NODES,
+    GEOMOPS_DISPLAY,
 )
 
 # Merge all available nodes
@@ -48,6 +50,7 @@ NODE_CLASS_MAPPINGS = {
     **ANDREA_NODES,
     **RENDERING_NODES,
     **TRELLIS_NODES,
+    **GEOMOPS_NODES,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -57,6 +60,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     **ANDREA_DISPLAY,
     **RENDERING_DISPLAY,
     **TRELLIS_DISPLAY,
+    **GEOMOPS_DISPLAY,
 }
 
 # Print status
@@ -68,6 +72,7 @@ print(f"   • Hunyuan nodes: {len(HUNYUAN_NODES)}")
 print(f"   • Andrea nodes: {len(ANDREA_NODES)}")
 print(f"   • Rendering nodes: {len(RENDERING_NODES)}")
 print(f"   • TRELLIS nodes: {len(TRELLIS_NODES)}")
+print(f"   • Geom Operations nodes: {len(GEOMOPS_NODES)}")
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
 __version__ = "0.4.0"  # Major reorganization + TRELLIS granular pipeline

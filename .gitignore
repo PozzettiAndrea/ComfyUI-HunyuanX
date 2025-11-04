@@ -30,11 +30,26 @@ models/
 # Test artifacts (keep directory structure, ignore generated files)
 tests/test_results/*.json
 tests/test_results/*.csv
-tests/output/*.glb
-tests/output/*.png
-tests/output/*.stl
-tests/output/*.obj
-tests/output/*.ply
+tests/output/**/*.glb
+tests/output/**/*.png
+tests/output/**/*.stl
+tests/output/**/*.obj
+tests/output/**/*.ply
+tests/output/**/*.mtl
+tests/output/**/*.jpg
+tests/output/**/*.jpeg
+# Ignore all test output directories (except .gitkeep markers)
+tests/output/*/
+!tests/output/.gitkeep
+
+# Ignore test render outputs (screenshots from render_utils.py)
+tests/test_renders/**/*.png
+tests/test_renders/**/*.jpg
+tests/test_renders/**/*.jpeg
+
+# Ignore generated mesh files in tests directory
+tests/**/*.glb
+tests/**/*.stl
 
 # IDE configurations
 .claude/settings.local.json

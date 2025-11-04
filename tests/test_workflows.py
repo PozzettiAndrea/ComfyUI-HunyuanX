@@ -7,11 +7,37 @@ This test suite:
 3. Tracks performance metrics (execution time, memory usage)
 4. Validates output generation
 5. Generates a test report
+6. Saves outputs to organized folders with automatic screenshots
 
 Total test cases: 18
 - trellis-i2m: 8 attention configs
 - trellis-t2m: 8 attention configs
 - hunyuan-i2m: 2 attention configs
+
+Output Structure:
+    tests/output/
+    ├── latest → 2025-11-03_14-30-00 (symlink to most recent run)
+    ├── 2025-11-03_14-30-00/
+    │   ├── hunyuan-i2m/
+    │   │   ├── sdpa.stl
+    │   │   ├── sdpa_preview.png
+    │   │   ├── flash_attn.stl
+    │   │   └── flash_attn_preview.png
+    │   ├── trellis-i2m/
+    │   │   ├── sdpa.glb
+    │   │   ├── sdpa_preview.png
+    │   │   └── ...
+    │   └── trellis-t2m/
+    │       └── ...
+    └── 2025-11-03_13-15-00/ (previous run, preserved)
+        └── ...
+
+Each test run creates:
+- Timestamped folder to preserve test history
+- Workflow-specific subdirectories
+- 3D output files (.glb, .stl, .obj)
+- PNG screenshot previews for visual verification
+- "latest" symlink for easy access to most recent results
 """
 
 import json
@@ -34,6 +60,7 @@ from testutils import (
     format_config_id,
 )
 from testutils.config_loader import load_test_config
+from render_utils import render_glb_to_image
 
 import threading
 workflow_lock = threading.Lock()
@@ -148,7 +175,8 @@ class ComfyClient:
             time.sleep(poll_interval)
 
     def execute_workflow(self, workflow: Dict[str, Any], timeout: int = 600,
-                        workflow_name: str = None, attention_config_name: str = None) -> Dict[str, Any]:
+                        workflow_name: str = None, attention_config_name: str = None,
+                        test_run_id: str = None) -> Dict[str, Any]:
         """
         Execute a workflow and wait for completion.
 
@@ -157,6 +185,7 @@ class ComfyClient:
             timeout: Maximum execution time in seconds
             workflow_name: Name of the workflow being tested (for output naming)
             attention_config_name: Attention config being tested (for output naming)
+            test_run_id: Unique ID for this test run (for organizing outputs)
 
         Returns:
             Dict with execution results and output information
@@ -189,15 +218,26 @@ class ComfyClient:
                 for img in node_output['images']:
                     output_files.append(img.get('filename', f"node_{node_id}_image"))
 
+            # Special handling for Preview3D nodes which use ui.result format
+            if 'ui' in node_output:
+                ui_data = node_output['ui']
+                if isinstance(ui_data, dict) and 'result' in ui_data:
+                    result = ui_data['result']
+                    if isinstance(result, (list, tuple)):
+                        for v in result:
+                            if v is not None and isinstance(v, str) and len(v) > 0:
+                                output_files.append(str(v))
+                    elif isinstance(result, str) and len(result) > 0:
+                        output_files.append(result)
+
             # Look for any output that contains file paths
             # Common patterns: result, glb_path, ply_path, mesh_path, file_path, etc.
             for key, value in node_output.items():
-                # Skip non-file outputs
+                # Skip already processed outputs
                 if key in ['images', 'ui']:
                     continue
 
                 # Check if this looks like a file path output
-                # Preview3D and similar nodes return files in 'result' key
                 if 'path' in key.lower() or 'file' in key.lower() or key == 'result':
                     if isinstance(value, (list, tuple)):
                         # Extract non-null values that look like file paths
@@ -215,18 +255,95 @@ class ComfyClient:
 
         # Copy outputs to test directory with descriptive names
         if output_files and workflow_name and attention_config_name:
-            test_output_dir = Path(__file__).parent / "output"
-            test_output_dir.mkdir(exist_ok=True)
+            # Create granular folder structure: output/{run_id}/{workflow_name}/
+            base_output_dir = Path(__file__).parent / "output"
+            if test_run_id:
+                test_output_dir = base_output_dir / test_run_id / workflow_name
+            else:
+                # Fallback if no run ID provided
+                test_output_dir = base_output_dir / workflow_name
+            test_output_dir.mkdir(parents=True, exist_ok=True)
+
+            # Get ComfyUI output directory for resolving relative paths
+            try:
+                # Try to import ComfyUI's folder_paths module
+                import sys
+                comfy_path = Path(__file__).parent.parent.parent.parent
+                if str(comfy_path) not in sys.path:
+                    sys.path.insert(0, str(comfy_path))
+                import folder_paths
+                comfy_output_dir = Path(folder_paths.get_output_directory())
+            except (ImportError, Exception):
+                # Fallback: assume default ComfyUI output structure
+                comfy_output_dir = Path(__file__).parent.parent.parent.parent / "output"
+                if not comfy_output_dir.exists():
+                    print(f"⚠️  Warning: Could not determine ComfyUI output directory")
+                    comfy_output_dir = Path.cwd()
+
+            # Supported 3D file formats
+            supported_formats = ('.glb', '.stl', '.obj', '.ply', '.fbx')
 
             for output_file in output_files:
-                if isinstance(output_file, str) and output_file.endswith('.glb'):
-                    src = Path(output_file)
-                    if src.exists():
-                        # Create descriptive filename: workflow-name_config.glb
-                        test_name = f"{workflow_name}_{attention_config_name}.glb"
-                        dst = test_output_dir / test_name
-                        shutil.copy2(src, dst)
-                        print(f"📁 Copied output: {dst.name}")
+                if not isinstance(output_file, str):
+                    continue
+
+                # Check if this is a 3D file
+                if not output_file.lower().endswith(supported_formats):
+                    continue
+
+                # Handle both absolute and relative paths
+                src = Path(output_file)
+                if not src.is_absolute():
+                    # Try to resolve relative path from ComfyUI output directory
+                    src = comfy_output_dir / output_file
+                    if not src.exists():
+                        # Also try current working directory
+                        src = Path(output_file)
+
+                if src.exists():
+                    # Create descriptive filename: config_name.ext
+                    file_ext = src.suffix
+                    test_name = f"{attention_config_name}{file_ext}"
+                    dst = test_output_dir / test_name
+                    shutil.copy2(src, dst)
+
+                    # Print relative path from output directory
+                    rel_path = dst.relative_to(base_output_dir)
+                    print(f"📁 Copied output: {rel_path}")
+
+                    # Generate screenshot for visual verification (skip if in headless env)
+                    if file_ext.lower() in ('.glb', '.stl', '.obj'):
+                        screenshot_name = f"{attention_config_name}_preview.png"
+                        screenshot_path = test_output_dir / screenshot_name
+                        try:
+                            import signal
+
+                            # Set timeout for rendering (max 10 seconds)
+                            def timeout_handler(signum, frame):
+                                raise TimeoutError("Screenshot rendering timed out")
+
+                            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+                            signal.alarm(10)  # 10 second timeout
+
+                            try:
+                                success = render_glb_to_image(
+                                    dst,
+                                    screenshot_path,
+                                    camera_position="isometric",
+                                    background_color="white",
+                                    show_edges=False
+                                )
+                                if success:
+                                    rel_screenshot = screenshot_path.relative_to(base_output_dir)
+                                    print(f"📸 Generated screenshot: {rel_screenshot}")
+                            finally:
+                                signal.alarm(0)  # Cancel alarm
+                                signal.signal(signal.SIGALRM, old_handler)
+
+                        except (Exception, TimeoutError) as e:
+                            print(f"⚠️  Screenshot skipped (headless env?): {type(e).__name__}")
+                else:
+                    print(f"⚠️  Output file not found: {output_file}")
 
         return {
             'prompt_id': prompt_id,
@@ -327,12 +444,13 @@ class TestMeshCraftWorkflows:
         timeout,
         track_workflow_performance,
         performance_tracker,
+        test_run_id,
     ):
         print(f"\n{'=' * 60}")
         print(f"Testing: {workflow_name} with {attention_config.name}")
         print(f"Timeout: {timeout}s")
         print(f"{'=' * 60}")
-    
+
         # 🚦 Absolute sequential guard
         with workflow_lock:
             with track_workflow_performance(
@@ -344,9 +462,10 @@ class TestMeshCraftWorkflows:
                     workflow,
                     timeout=timeout,
                     workflow_name=workflow_name,
-                    attention_config_name=attention_config.name
+                    attention_config_name=attention_config.name,
+                    test_run_id=test_run_id
                 )
-    
+
                 assert 'outputs' in result, "No outputs returned from workflow"
                 assert result['output_files'], "No output files generated"
                 tracker.add_outputs(result['output_files'])

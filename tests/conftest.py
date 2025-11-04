@@ -4,6 +4,7 @@ import pytest
 import os
 import shutil
 from pathlib import Path
+from datetime import datetime
 
 # --- Add MeshCraft to sys.path ---
 TESTS_DIR = Path(__file__).resolve().parent
@@ -122,16 +123,33 @@ import numpy as np
 
 @pytest.fixture
 def temp_mesh_file(tmp_path):
-    """Create a temporary .obj mesh file for testing."""
-    mesh = trimesh.creation.box(extents=(1, 1, 1))
+    """Create a temporary mesh file for testing."""
+    # Load Stanford Bunny from examples
+    bunny_path = MESHCRAFT_DIR / "examples" / "Stanford_Bunny.stl"
+    mesh = trimesh.load(bunny_path)
+    # Export to temp location
     mesh_path = tmp_path / "test_mesh.obj"
     mesh.export(mesh_path)
     return mesh_path
 
 @pytest.fixture
 def sample_trimesh():
-    """Provide a simple cube mesh for postprocessing tests."""
-    return trimesh.creation.box(extents=(1, 1, 1))
+    """Provide Stanford Bunny mesh for all tests."""
+    bunny_path = MESHCRAFT_DIR / "examples" / "Stanford_Bunny.stl"
+    return trimesh.load(bunny_path)
+
+@pytest.fixture
+def sample_camera_config():
+    """Provide a standard 4-view camera configuration for rendering tests."""
+    from nodes.hunyuan_nodes import Hy3D21CameraConfig
+    node = Hy3D21CameraConfig()
+    result = node.process(
+        camera_azimuths="0, 90, 180, 270",
+        camera_elevations="0, 0, 0, 0",
+        view_weights="1.0, 1.0, 1.0, 1.0",
+        ortho_scale=1.0
+    )
+    return result[0]
 
 @pytest.fixture(scope="class")
 def args_pytest():
@@ -170,3 +188,45 @@ def track_workflow_performance():
         print(f"⚙️  Mock tracking workflow performance: {kwargs}")
         yield Dummy()
     return _tracker
+
+
+@pytest.fixture(scope="session")
+def test_run_id():
+    """
+    Generate a unique test run ID for organizing output files.
+
+    This creates a timestamped folder for each test run, allowing you to:
+    - Preserve outputs from different test runs
+    - Compare results across different test sessions
+    - Track test history
+
+    Also creates a "latest" symlink pointing to the most recent run.
+
+    Returns:
+        str: Timestamp in format YYYY-MM-DD_HH-MM-SS
+    """
+    run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    print(f"\n🏃 Test Run ID: {run_id}")
+
+    # Create symlink to latest run after first test starts
+    # (actual directory will be created by test execution)
+    output_dir = TESTS_DIR / "output"
+    latest_link = output_dir / "latest"
+
+    # Yield the run ID first so tests can use it
+    yield run_id
+
+    # After all tests complete, update the "latest" symlink
+    run_dir = output_dir / run_id
+    if run_dir.exists():
+        # Remove old symlink if it exists
+        if latest_link.exists() or latest_link.is_symlink():
+            latest_link.unlink()
+
+        # Create new symlink (relative path for portability)
+        try:
+            latest_link.symlink_to(run_id, target_is_directory=True)
+            print(f"\n✅ Updated 'latest' symlink → {run_id}")
+        except OSError as e:
+            # Symlinks might not be supported on all platforms
+            print(f"\n⚠️  Could not create 'latest' symlink: {e}")

@@ -1,385 +1,239 @@
 # TRELLIS Quick Start Guide
 
-Microsoft TRELLIS integration for ComfyUI-MeshCraft - Multi-view 3D generation with sparse latents.
+Microsoft TRELLIS - Structured 3D latents for multi-view 3D generation.
 
 ## Overview
 
-TRELLIS (Structured 3D Latents) is a cutting-edge 3D generation model from Microsoft Research that:
+TRELLIS excels at:
+- **Multi-view fusion** - Combine 2-3 images (front/back/side)
+- **Fragmented objects** - Better than dense voxels for incomplete geometry
+- **Multiple outputs** - Mesh, Gaussian splats, radiance fields
+- **Text-to-3D** - Generate from text descriptions
 
-- ✅ Supports **single-image** and **multi-image** 3D generation
-- ✅ Generates multiple output formats (mesh, Gaussian splats, radiance fields)
-- ✅ Handles **partial/fragmented objects** better than dense voxel approaches
-- ✅ Ideal for **archaeological pottery fragments** (front+back reconstruction)
-- ✅ Uses **tuning-free multi-view fusion** (no retraining needed!)
+**Ideal for**: Pottery fragments, archaeological reconstruction, multi-view captures
 
-**Paper**: [Structured 3D Latents for Scalable and Versatile 3D Generation](https://arxiv.org/abs/2412.01506) (CVPR 2025 Spotlight)
+**Paper**: [Structured 3D Latents](https://arxiv.org/abs/2412.01506) (CVPR 2025)
 
 ---
 
 ## Installation
 
-### 1. Basic Dependencies (Auto-installed)
+TRELLIS dependencies auto-install when you run `python install.py`.
 
-The prestartup script automatically installs:
-- `imageio` + `ffmpeg` support
-- `einops` for tensor operations
-
-### 2. Optional Performance Boost
-
-For 10-20% faster inference:
-
+**Optional** (10-20% speedup):
 ```bash
-# Option A: Flash Attention (recommended for RTX 4090/5090)
 pip install flash-attn --no-build-isolation
-
-# Option B: xformers (alternative)
-pip install xformers
-```
-
-### 3. Advanced Dependencies (Manual)
-
-For full TRELLIS functionality:
-
-```bash
-# Sparse convolution (version-specific to your CUDA version)
-pip install spconv-cu118  # For CUDA 11.8
-
-# 3D operations library
-pip install kaolin
-
-# Differentiable rendering
-pip install nvdiffrast
 ```
 
 ---
 
-## Quick Start: Basic Workflow
+## Basic Workflow (Image-to-3D)
 
-### Step 1: Download Model
-
+### 1. Load Models
 ```
-TrellisDownloadModel 📥
-├─ model_name: "TRELLIS-image-large"  # 2-3GB download
-├─ auto_download: true
-└─ → model_path (STRING)
+Load_DinoV2_Model → dinov2_model
+Load_Trellis_Model (model_name="microsoft/TRELLIS-image-large") → trellis_model
 ```
 
-### Step 2: Generate 3D from Single Image
-
+### 2. Granular Pipeline
 ```
-Load Image
+LoadImage → image
   ↓
-TrellisImageTo3D 🖼️➡️🎲
-├─ image: IMAGE
-├─ model_path: (from Step 1)
-├─ output_format: "mesh"
-├─ seed: 42
-├─ ss_steps: 12             # Sparse structure steps
-├─ ss_cfg_strength: 7.5
-├─ slat_steps: 12           # SLAT refinement steps
-├─ slat_cfg_strength: 3.0
-└─ → mesh (TRIMESH), outputs (DICT)
-```
-
-### Step 3: Save or Post-Process
-
-```
-mesh → Hy3D21ExportMesh → Save GLB
-```
-
----
-
-## Advanced: Multi-View Pottery Reconstruction
-
-Perfect for **front+back pottery fragments**!
-
-### Workflow
-
-```
-Load Image (front view)
-Load Image (back view)
-  ↓ (batch images)
-TrellisMultiImageTo3D 🖼️🖼️➡️🎲
-├─ images: IMAGE (batch of 2-8 images)
-├─ model_path: (from download node)
-├─ fusion_mode: "stochastic" or "multidiffusion"
-│   ├─ stochastic: Round-robin view selection (good for opposite angles like front+back)
-│   └─ multidiffusion: Prediction averaging (good for similar viewpoints)
-├─ output_format: "mesh"
-├─ seed: 42
-├─ ss_steps: 12
-├─ ss_cfg_strength: 7.5
-├─ slat_steps: 12
-├─ slat_cfg_strength: 3.0
-└─ → mesh (TRIMESH), outputs (DICT)
-```
-
-### Fusion Modes Explained
-
-#### Stochastic Mode (Recommended for Front+Back)
-
-```
-Steps: [0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11]
-Views: [F,  B,  F,  B,  F,  B,  F,  B,  F,  B,  F,  B]
-       Front alternates with Back
-```
-
-**Pros:**
-- Better for **opposing viewpoints** (e.g., 0° and 180°)
-- Faster inference (one view at a time)
-- Works well with 2-8 images
-
-**Cons:**
-- May miss features if `num_images > num_steps`
-
-#### Multidiffusion Mode
-
-```
-At each step:
-  pred_front = model(front_image)
-  pred_back = model(back_image)
-  final_pred = (pred_front + pred_back) / 2
-```
-
-**Pros:**
-- Better for **similar viewpoints** (e.g., 0°, 45°, 90°)
-- Smoother blending
-
-**Cons:**
-- Slower (N× forward passes per step)
-- May conflict with opposite angles
-
----
-
-## Hybrid Workflow: TRELLIS + Hunyuan
-
-**Best of both worlds**: TRELLIS geometry + Hunyuan textures
-
-```
-Load Image (pottery fragment)
+Trellis_Image_Preprocessor → preprocessed_image
+├─ remove_background: true
+└─ recenter: true
   ↓
-TrellisImageTo3D (generate base geometry)
-  ↓ mesh
-Hy3D21PostprocessMesh (clean topology)
-  ↓ mesh
-Hy3DMultiViewsGenerator (add high-quality PBR textures)
-  ├─ mesh: (from TRELLIS)
-  ├─ image: (original reference image)
-  └─ → textured mesh
-Hy3D21ExportMesh (save GLB with textures)
+Trellis_Image_Conditioning → conditioning
+├─ dinov2_model
+└─ preprocessed_image
+  ↓
+Trellis_SparseStructure_Sampler → sparse_latents
+├─ trellis_model
+├─ conditioning
+├─ seed: 42
+├─ cfg: 7.5
+└─ steps: 12
+  ↓
+Trellis_SLAT_Sampler → slat_latents
+├─ trellis_model
+├─ sparse_latents
+├─ cfg: 3.0
+└─ steps: 12
+  ↓
+Trellis_SLAT_Decoder → outputs
+├─ slat_latents
+├─ formats: ["mesh", "gaussian"]
+└─ texture_size: 1024
+  ↓
+Trellis_Export_GLB → glb_path
 ```
-
-**Why this works:**
-- TRELLIS excels at **geometry reconstruction** for partial objects
-- Hunyuan excels at **PBR texture generation** (albedo, metallic, roughness)
-- Combined result has accurate shape + photorealistic materials
 
 ---
 
-## Tips for Pottery Fragments
+## Multi-View Fusion (Pottery Reconstruction)
 
-### Input Image Preparation
+Combine 2-3 views for better geometry:
 
-1. **Preprocessing**: Remove background (use `rembg` or manual masking)
-2. **Lighting**: Uniform, diffuse lighting works best
-3. **Resolution**: 518×518 px (TRELLIS will auto-resize)
-4. **Format**: PNG with alpha channel preferred
-
-### Parameter Tuning
-
-| Scenario | ss_steps | ss_cfg_strength | slat_steps | slat_cfg_strength |
-|----------|----------|-----------------|------------|-------------------|
-| **Fast preview** | 8 | 5.0 | 8 | 2.0 |
-| **Balanced (default)** | 12 | 7.5 | 12 | 3.0 |
-| **High quality** | 20 | 10.0 | 20 | 4.0 |
-| **Pottery fragments** | 15 | 8.0 | 15 | 3.5 |
-
-**Rules of thumb:**
-- Higher `ss_steps` = better coarse geometry
-- Higher `slat_steps` = finer surface details
-- Higher `cfg_strength` = stronger adherence to input image
-
-### Multi-View Tips
-
-**For front+back pottery:**
-
-```yaml
-fusion_mode: "stochastic"  # Better for opposite angles
-ss_steps: 18               # Extra steps for complex geometry
-slat_steps: 18             # Extra refinement for details
-seed: 42                   # Reproducibility
+```
+LoadImage (front) ─┐
+LoadImage (back)  ─┼→ Trellis_multiimage_loader → combined_image
+LoadImage (side)  ─┘
+  ↓
+Trellis_Image_Preprocessor
+  ↓
+Trellis_Image_Conditioning
+  ↓
+Trellis_SparseStructure_Sampler
+├─ multi_image: true
+└─ multiimage_algo: "multidiffusion"  # or "stochastic"
+  ↓
+... (continue as single-image pipeline)
 ```
 
-**If adding side views:**
+**Algorithms**:
+- `multidiffusion`: Averages features (smoother, recommended)
+- `stochastic`: Random view selection (faster, more varied)
 
-```yaml
-images: [front, left, back, right]  # 90° increments
-fusion_mode: "multidiffusion"       # Smoother blending
-ss_steps: 12
-slat_steps: 12
+---
+
+## Text-to-3D
+
+```
+Load_CLIP_Trellis → clip_model
+Load_Trellis_Model (model_name="microsoft/TRELLIS-text-large") → trellis_model
+  ↓
+Trellis_Text_Conditioning → conditioning
+├─ clip_model
+└─ prompt: "A ceramic vase with blue glaze"
+  ↓
+Trellis_SparseStructure_Sampler → sparse_latents
+  ↓
+... (same as image pipeline)
 ```
 
 ---
 
 ## Output Formats
 
-### Mesh (Default)
+| Format | Use Case | Export Node |
+|--------|----------|-------------|
+| **mesh** | General 3D model | `Trellis_Export_GLB` |
+| **gaussian** | Point cloud rendering | `Trellis_Export_PLY` |
+| **radiance** | NeRF-style view synthesis | *(decode only, no export)* |
 
-```
-output_format: "mesh"
-→ TRIMESH object (vertices + faces)
-```
+---
 
-**Compatible with:**
-- Hunyuan texture generation
-- MeshLab post-processing
-- Blender import
-- GLB/OBJ export
+## Parameters Guide
 
-### Gaussian Splats
+### Sparse Structure Sampler
+- `cfg`: 5.0-10.0 (7.5 default) - Higher = more faithful to input
+- `steps`: 8-20 (12 default) - More = better quality, slower
 
-```
-output_format: "gaussian"
-→ 3D Gaussian splat representation
-```
+### SLAT Sampler
+- `cfg`: 2.0-5.0 (3.0 default) - Refines geometry details
+- `steps`: 8-20 (12 default) - More = smoother surface
 
-**Use cases:**
-- Real-time rendering
-- Neural rendering pipelines
-- Export to `.ply` or `.splat` formats
+### Decoder
+- `texture_size`: 512/1024/2048 - Higher = better textures, more VRAM
+- `mesh_simplify`: 0.9-0.98 - Reduce polygon count (0.95 = 5% decimation)
 
-### Radiance Field (NeRF)
+---
 
-```
-output_format: "radiance_field"
-→ Neural radiance field representation
-```
+## Tips
 
-**Use cases:**
-- Novel view synthesis
-- Volume rendering
-- Research applications
+**For Best Quality**:
+- Remove backgrounds before processing
+- Use `multidiffusion` for multi-view
+- Increase steps to 20 for both samplers
+- Use texture_size=2048 (if VRAM allows)
 
-### All Formats
+**For Speed**:
+- Install flash-attn
+- Reduce steps to 8
+- Use `mode="fast"` in decoder
+- Lower texture_size to 512
 
-```
-output_format: "all"
-→ outputs dict with all three formats
-```
+**For Pottery/Fragments**:
+- Use multi-view with front+back images
+- Enable `recenter` in preprocessor
+- Try `stochastic` algorithm for variety
+- Post-process with `MeshCraft_GeomOperations`
 
 ---
 
 ## Troubleshooting
 
-### "TRELLIS package not found"
+**Out of Memory**:
+- Reduce texture_size
+- Use `mode="fast"` in decoder
+- Process one view at a time
 
-**Cause**: TRELLIS submodule not initialized
+**Poor Quality**:
+- Check image backgrounds (remove if needed)
+- Increase CFG strength
+- Add more steps
+- Try multi-view instead of single image
 
-**Solution**:
-```bash
-cd ComfyUI/custom_nodes/ComfyUI-MeshCraft
-git submodule update --init --recursive
-```
-
-### "spconv not installed" warnings
-
-**Cause**: Sparse convolution library not installed
-
-**Solution**:
-```bash
-# Install for your CUDA version
-pip install spconv-cu118  # CUDA 11.8
-pip install spconv-cu121  # CUDA 12.1
-```
-
-### Out of memory (CUDA OOM)
-
-**Solutions**:
-1. Reduce steps: `ss_steps=8, slat_steps=8`
-2. Use fewer images in multi-view mode
-3. Disable model caching: `use_cache=false`
-4. Clear GPU memory: Restart ComfyUI
-
-### Poor geometry quality
-
-**Fixes**:
-1. Increase steps: `ss_steps=20, slat_steps=20`
-2. Adjust CFG strength: Try `ss_cfg_strength=10.0`
-3. Try different seeds (TRELLIS can be sensitive)
-4. Preprocess input: remove background, adjust lighting
-
-### Multi-view artifacts
-
-**Fixes**:
-1. Switch fusion mode (`stochastic` ↔ `multidiffusion`)
-2. Increase steps for smoother blending
-3. Ensure consistent lighting across views
-4. Remove backgrounds from all input images
+**Model Download Fails**:
+- Models auto-download from HuggingFace (~2-3GB)
+- Manually download: `huggingface-cli download microsoft/TRELLIS-image-large`
 
 ---
 
-## Performance Benchmarks
+## Example Workflows
 
-**Hardware**: NVIDIA RTX 4090 (24GB VRAM)
-
-| Mode | Resolution | Steps (SS/SLAT) | Time | VRAM |
-|------|------------|-----------------|------|------|
-| Single image | 518×518 | 12/12 | ~15s | 10GB |
-| Multi-view (2 images) | 518×518 | 12/12 | ~25s | 12GB |
-| Multi-view (4 images) | 518×518 | 12/12 | ~40s | 14GB |
-| High quality | 518×518 | 20/20 | ~30s | 12GB |
-
-**With Flash Attention**: 10-20% faster
+See `workflows/` directory:
+- `trellis-i2m.json` - Single image to 3D
+- `trellis-t2m.json` - Text to 3D
 
 ---
 
-## Examples
+## Advanced Features
 
-### Example 1: Single Fragment
-
+### SLAT Visualization
 ```
-Input: Single pottery shard image
-Node: TrellisImageTo3D
-Parameters: Default (12/12 steps)
-Output: Clean 3D mesh ready for texturing
-Time: ~15 seconds
-```
-
-### Example 2: Front+Back Reconstruction
-
-```
-Inputs: Front view + Back view of pottery fragment
-Node: TrellisMultiImageTo3D
-Parameters: fusion_mode="stochastic", 18/18 steps
-Output: Complete 3D reconstruction capturing both sides
-Time: ~30 seconds
+Trellis_SLAT_Visualizer
+├─ slat: (from SLAT_Sampler)
+├─ filename: "debug_slat"
+└─ colorscale: "Viridis"
+  ↓
+Outputs interactive 3D point cloud HTML
 ```
 
-### Example 3: Hybrid Pipeline
-
+### Video Rendering
 ```
-Step 1: TRELLIS generates geometry (15s)
-Step 2: Hunyuan Paint adds PBR textures (45s)
-Total: ~60 seconds for production-ready GLB
+Trellis_Render_Video
+├─ outputs: (from decoder)
+├─ video_format: "mp4"
+└─ fps: 30
+  ↓
+360° turntable animation
 ```
 
 ---
 
-## References
+## Node Reference
 
-- **Paper**: [Structured 3D Latents for Scalable and Versatile 3D Generation](https://arxiv.org/abs/2412.01506)
-- **GitHub**: https://github.com/microsoft/TRELLIS
-- **Project Page**: https://trellis3d.github.io/
-- **Model**: `microsoft/TRELLIS-image-large` on Hugging Face
+**Loaders (3)**:
+- `Load_DinoV2_Model` - Image encoder
+- `Load_CLIP_Trellis` - Text encoder
+- `Load_Trellis_Model` - Main pipeline
+
+**Pipeline (9)**:
+- `Trellis_Image_Preprocessor` - Clean/recenter images
+- `Trellis_Image_Conditioning` - Encode images
+- `Trellis_Text_Conditioning` - Encode text
+- `Trellis_SparseStructure_Sampler` - Generate sparse voxels
+- `Trellis_SLAT_Sampler` - Refine with structured latents
+- `Trellis_SLAT_Decoder` - Decode to 3D
+- `Trellis_SLAT_Visualizer` - Debug visualization
+- `Trellis_Export_GLB` - Save mesh
+- `Trellis_Export_PLY` - Save Gaussians
+- `Trellis_Render_Video` - Create turntable
+
+**Utilities (1)**:
+- `Trellis_multiimage_loader` - Combine 2-3 images
 
 ---
 
-## License
-
-TRELLIS is released under the MIT License by Microsoft Research.
-
-ComfyUI-MeshCraft TRELLIS integration: MIT License
-
----
-
-**Questions?** Open an issue at https://github.com/YOUR_USERNAME/ComfyUI-MeshCraft/issues
+**Total Nodes**: 17 (formerly 19, removed deprecated monolithic samplers)

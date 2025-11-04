@@ -57,8 +57,37 @@ def reducefacesnano(new_mesh, max_facenum: int):
         return new_mesh
 
     except Exception as e:
-        print(f"Instant Meshes failed: {e}, returning original mesh")
-        return new_mesh
+        # Fallback to trimesh's quadric edge collapse decimation
+        print(f"Instant Meshes not available ({e}), using trimesh quadric decimation fallback...")
+
+        try:
+            # Use trimesh's simplify_quadric_decimation (requires fast-simplification package)
+            decimated_mesh = new_mesh.simplify_quadric_decimation(max_facenum)
+
+            print(f"Decimated: {decimated_mesh.vertices.shape[0]} vertices, {decimated_mesh.faces.shape[0]} faces")
+            return decimated_mesh
+
+        except ImportError as import_error:
+            print(f"fast-simplification not installed ({import_error})")
+            print("Install with: pip install fast-simplification")
+            print("Falling back to vertex clustering...")
+
+            try:
+                # Fallback #2: vertex clustering (lower quality but no dependencies)
+                bounds_size = np.linalg.norm(new_mesh.bounds[1] - new_mesh.bounds[0])
+                target_edge_length = bounds_size * np.sqrt(1.0 / max_facenum) * 2.0
+                clustered_mesh = new_mesh.simplify_vertex_clustering(tolerance=target_edge_length)
+
+                print(f"Clustered: {clustered_mesh.vertices.shape[0]} vertices, {clustered_mesh.faces.shape[0]} faces")
+                return clustered_mesh
+
+            except Exception as cluster_error:
+                print(f"All fallbacks failed: {cluster_error}, returning original mesh")
+                return new_mesh
+
+        except Exception as fallback_error:
+            print(f"Decimation failed: {fallback_error}, returning original mesh")
+            return new_mesh
 
 
 class MeshCraftPostProcess:
