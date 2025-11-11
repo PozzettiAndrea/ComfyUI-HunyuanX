@@ -36,7 +36,7 @@ cd ComfyUI-HunyuanX
 pip install -r requirements.txt
 ```
 
-### Via ComfyUI Manager
+### Via ComfyUI-Manager
 1. Open ComfyUI Manager
 2. Search for "ComfyUI-HunyuanX"
 3. Click Install
@@ -45,173 +45,165 @@ pip install -r requirements.txt
 
 ---
 
-## All Nodes (64 total)
+## All Nodes (~24 total)
 
-### Mesh Processing (3 nodes)
+### Hunyuan 3D 2.1 - Standard Pipeline (13 nodes)
+
+**Model Loaders**
 | Node | Purpose |
 |------|---------|
-| `MeshCraftPostProcess` | Floater removal, face reduction, normal smoothing (fixed order) |
-| `MeshCraft_GeomOperations` | **NEW**: Flexible 1-10 operation slots with intermediate outputs |
-| `MeshCraftUVUnwrap` | UV unwrapping (xatlas or Blender) |
+| `Hy3D21VAELoader` | Load Hunyuan VAE model |
+| `Hy3D21CameraConfig` | Configure camera parameters |
 
-### Hunyuan 3D - Monolithic (13 nodes)
+**Input Nodes**
 | Node | Purpose |
 |------|---------|
-| `Hy3DMeshGenerator` | Generate 3D mesh from image (with caching) |
-| `Hy3DMultiViewsGenerator` | Generate PBR multiview renders (albedo, MR, normals, positions) |
-| `Hy3DBakeMultiViews` | Bake multiview images to UV texture |
-| `Hy3DInPaint` | Fill texture holes |
-| `Hy3D21CameraConfig` | Configure camera azimuths, elevations, weights |
-| `Hy3D21VAELoader` | Load VAE with caching |
-| `Hy3D21VAEDecode` | Decode latents to mesh |
 | `Hy3D21LoadImageWithTransparency` | Load RGBA image |
-| `Hy3D21PostprocessMesh` | Hunyuan post-processor (pymeshlab-based) |
-| `Hy3D21ExportMesh` | Export mesh to GLB/OBJ/PLY/STL/3MF/DAE |
+| `Hy3D21ImageWithAlphaInput` | Direct RGBA input |
+
+**Core Pipeline**
+| Node | Purpose |
+|------|---------|
+| `Hy3DMeshGenerator` | Generate 3D mesh from image (DiT Flow Matching) |
+| `Hy3D21VAEDecode` | Decode latents to mesh |
+| `Hy3D21PostprocessMesh` | Clean and optimize mesh |
+
+**Texture Generation**
+| Node | Purpose |
+|------|---------|
+| `Hy3DMultiViewsGenerator` | Generate multi-view textures |
+| `Hy3DBakeMultiViews` | Bake textures onto mesh |
+| `Hy3DInPaint` | Inpaint/complete textures |
+
+**Mesh Operations**
+| Node | Purpose |
+|------|---------|
 | `Hy3D21MeshUVWrap` | UV unwrap mesh |
-| `Hy3D21LoadMesh` | Load mesh from GLB |
-| `Hy3D21ImageWithAlphaInput` | Combine image + mask → RGBA |
-
-### Hunyuan 3D - Modular (9 nodes)
-*Memory-efficient split pipeline (load DiT/VAE separately)*
-| Node | Purpose |
-|------|---------|
-| `PrepareImageForDINO` | Recenter, resize, normalize for DINO |
-| `LoadDinoModel` | Load DINO v2 (small/base/large/giant) |
-| `EncodeDINO` | Encode image to DINO embeddings |
-| `LoadHunyuanDiT` | Load DiT model only (saves ~2GB VRAM) |
-| `LoadHunyuanVAE` | Load VAE decoder separately |
-| `Hy3DGenerateLatents` | Generate 3D latents from DINO embeddings |
-| `Hy3DDecodeLatents` | Decode latents to mesh |
-| `Hy3DImageToLatents` | All-in-one convenience node |
-| `PreviewTrimesh` | Interactive 3D preview (PyVista) |
-
-### Texture Generation / Rendering (7 nodes)
-| Node | Purpose |
-|------|---------|
-| `LoadHunyuanMultiViewModel` | Load multiview diffusion model for PBR |
-| `RenderConditioningMaps` | Render normal + position maps |
-| `RenderRGBMultiview` | Blender rendering (Cycles/Eevee) |
-| `GenerateMultiviewPBR` | Generate albedo + MR textures |
-| `BakeMultiviewTextures` | Geometric projection to UV space |
-| `InpaintTextures` | OpenCV inpainting (NS/Telea) |
-| `ApplyAndSaveTexturedMesh` | Apply textures and export OBJ + GLB |
-
-### TRELLIS (17 nodes)
-**Loaders (3)**
-| Node | Purpose |
-|------|---------|
-| `Load_DinoV2_Model` | Load DINO v2 for TRELLIS |
-| `Load_CLIP_Trellis` | Load CLIP for text conditioning |
-| `Load_Trellis_Model` | Load TRELLIS pipeline (image/text) |
-
-**Granular Pipeline (9)**
-| Node | Purpose |
-|------|---------|
-| `Trellis_Image_Preprocessor` | Preprocess image (remove background, recenter) |
-| `Trellis_Image_Conditioning` | Encode image to conditioning |
-| `Trellis_Text_Conditioning` | Encode text to conditioning |
-| `Trellis_SparseStructure_Sampler` | Sample sparse voxel structure |
-| `Trellis_SLAT_Sampler` | Sample SLAT embeddings |
-| `Trellis_SLAT_Decoder` | Decode to Gaussian/mesh/radiance field |
-| `Trellis_SLAT_Visualizer` | Visualize SLAT as 3D point cloud |
-| `Trellis_Export_GLB` | Export mesh to GLB |
-| `Trellis_Export_PLY` | Export Gaussian splats to PLY |
-| `Trellis_Render_Video` | Render 360° turntable video |
-
-**Utilities (1)**
-| Node | Purpose |
-|------|---------|
-| `Trellis_multiimage_loader` | Load 2-3 images for multi-view fusion |
-
-### Interpolation (3 nodes)
-| Node | Purpose |
-|------|---------|
-| `VAELatentInterpolation` | Interpolate between images in VAE latent space (SLERP/LERP) |
-| `Hunyuan3DLatentInterpolation` | Morph between 3D meshes |
-| `DINOEmbeddingInterpolation` | Semantic image transitions |
+| `Hy3D21LoadMesh` | Load mesh from file |
+| `Hy3D21ExportMesh` | Export to various formats |
 
 ---
 
-## Key Improvements
+### Hunyuan 3D 2.1 - Modular Pipeline (9 nodes)
+
+For fine-grained control over the generation process:
+
+**Image Preprocessing**
+| Node | Purpose |
+|------|---------|
+| `PrepareImageForDINO` | Preprocess images for DINO encoder |
+
+**Model Loaders**
+| Node | Purpose |
+|------|---------|
+| `LoadDinoModel` | Load DINO v2 vision encoder |
+| `LoadHunyuanDiT` | Load Hunyuan DiT (diffusion transformer) |
+| `LoadHunyuanVAE` | Load Hunyuan VAE |
+
+**Modular Pipeline**
+| Node | Purpose |
+|------|---------|
+| `EncodeDINO` | Encode image to DINO embeddings |
+| `Hy3DGenerateLatents` | Generate mesh latents from embeddings |
+| `Hy3DDecodeLatents` | Decode latents to mesh |
+| `Hy3DImageToLatents` | All-in-one convenience node |
+
+**Visualization**
+| Node | Purpose |
+|------|---------|
+| `PreviewTrimesh` | Interactive 3D mesh preview |
+
+---
+
+### Texture Generation / Rendering (~2 nodes)
+
+| Node | Purpose |
+|------|---------|
+| `LoadHunyuanMultiViewModel` | Load Hunyuan multi-view diffusion model |
+| Additional texture generation nodes... |
+
+---
+
+## Key Features
 
 ### ✅ Model Caching
-Hunyuan nodes cache models between runs for 5-10x speedup
+- **5-10x faster reloads**: Models stay in memory between generations
+- **Smart memory management**: Only loads models when needed
 
 ### ✅ Lazy Loading
-Startup time reduced from ~26s to <2s via deferred imports
+- **Faster startup**: Models load on first use, not at ComfyUI startup
+- **Lower memory footprint**: Only loaded models consume memory
 
 ### ✅ Granular Pipelines
-- **TRELLIS**: Split into 9 nodes for fine control
-- **Hunyuan**: Modular pipeline with separate DiT/VAE loading
-
-### ✅ Flexible Geometric Operations (NEW)
-`MeshCraft_GeomOperations` allows:
-- 1-10 operation slots (configurable via slider)
-- Arbitrary operation order
-- Intermediate outputs for each operation
-- Operations: remove_floaters, remove_degenerate, reduce_faces, smooth_normals, laplacian_smooth, ensure_manifold
-
-### ✅ Multi-View Fusion
-TRELLIS supports combining 2-3 views (front/back/side) for better reconstruction (ideal for pottery fragments)
+- **Standard pipeline**: Simple all-in-one nodes for quick generation
+- **Modular pipeline**: Split DiT/VAE loading for research and fine control
+- **Memory efficient**: Load only the components you need
 
 ---
 
 ## Example Workflows
 
-Check the `workflows/` directory for:
-- `hunyuan-i2m.json` - Hunyuan image-to-3D
-- `trellis-i2m.json` - TRELLIS image-to-3D
-- `trellis-t2m.json` - TRELLIS text-to-3D
+Workflows are included in the `workflows/` directory:
+- `hunyuan-i2m.json` - Hunyuan image-to-3D with texture generation
+
+These workflows are automatically copied to ComfyUI's workflow directory on first run.
 
 ---
 
 ## Documentation
 
-- **Installation**: See `docs/INSTALLATION.md` for detailed setup
-- **Hunyuan Guide**: `docs/README_HUNYUAN.md`
-- **TRELLIS Guide**: `docs/TRELLIS_QUICKSTART.md`
-- **Interpolation**: `docs/INTERPOLATION_USAGE.md`
+- **Installation Guide**: See above
+- **Requirements**: See `requirements.txt`
+- **Testing**: See `tests/README.md`
 
 ---
 
-## Requirements
+## System Requirements
 
-**Core:**
-- Python 3.10+
-- PyTorch 2.5-2.8 (for Kaolin compatibility)
-- NVIDIA GPU with CUDA (for full features)
-- See `requirements.txt` for full list
+### Minimum
+- **GPU**: NVIDIA with 16GB+ VRAM
+- **RAM**: 32GB+
+- **Python**: 3.10+
+- **PyTorch**: 2.5.0 - 2.8.0
+- **CUDA**: 12.x
 
-**Optional:**
-- **Blender**: For Smart UV unwrapping and RGB multiview rendering
-- **flash-attn**: 10-20% faster inference (requires compilation)
-- **spconv**: For TRELLIS sparse convolution (auto-installs)
+### Recommended
+- **GPU**: NVIDIA with 24GB+ VRAM (A5000, RTX 4090, A6000)
+- **RAM**: 64GB+
+- **Storage**: 50GB+ for models
 
 ---
 
-## Roadmap
+## Dependencies
 
-- [x] PyVista integration (✅ done - `PreviewTrimesh`)
-- [x] UV unwrapping utilities (✅ done - 2 nodes)
-- [x] Flexible geometric operations (✅ done - `MeshCraft_GeomOperations`)
-- [ ] Batch processing improvements
-- [ ] Additional texture editing tools
+### Core (Required)
+- PyTorch 2.5.0-2.8.0
+- trimesh, pymeshlab, pygltflib, xatlas
+- transformers, diffusers, timm, einops
+- opencv-python, Pillow, rembg
+
+### Optional
+- **Kaolin**: For advanced mesh operations (auto-installs)
+- **flash-attn**: 10-20% faster inference (auto-installs)
+- **spconv**: For sparse convolutions (auto-installs)
+- **Blender**: For RGB multiview rendering
+
+All dependencies are automatically installed by `install.py`.
 
 ---
 
 ## License
 
-See individual model licenses:
-- **Hunyuan 3D**: Tencent Hunyuan Community License (<1M MAU)
-- **TRELLIS**: Microsoft Research License
-- **MeshCraft code**: MIT License
+- **Hunyuan 3D 2.1**: Tencent License
+- **HunyuanX code**: MIT License
 
 ---
 
 ## Contributing
 
-Issues and PRs welcome at: https://github.com/YOUR_USERNAME/ComfyUI-MeshCraft
+Issues and PRs welcome at: https://github.com/YOUR_USERNAME/ComfyUI-HunyuanX
 
----
+## Credits
 
-**Version**: 0.4.0 | **Total Nodes**: 64
+- Tencent Hunyuan Team for Hunyuan 3D 2.1
+- ComfyUI community

@@ -370,7 +370,7 @@ class RenderRGBMultiview:
     This uses Blender's Cycles/Eevee renderer to create high-quality multiview RGB images,
     exactly as described in Hunyuan3D-2.1 data preprocessing documentation.
 
-    Based on the rendering pipeline from TRELLIS and Objaverse datasets.
+    Based on the rendering pipeline from Hunyuan 3D and Objaverse datasets.
 
     Uses:
     - Creating reference images matching Hunyuan3D training data

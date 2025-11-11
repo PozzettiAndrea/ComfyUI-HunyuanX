@@ -63,4 +63,4 @@ else:
     NODE_DISPLAY_NAME_MAPPINGS = {}
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
-__version__ = "1.0.0"  # Split from MeshCraft - Hunyuan 3D 2.1 only
+__version__ = "1.0.0"  # Hunyuan 3D 2.1 nodes for ComfyUI
