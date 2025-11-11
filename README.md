@@ -1,29 +1,29 @@
-# ComfyUI-MeshCraft
+# ComfyUI-HunyuanX
 
-**Complete 3D generation and manipulation package for ComfyUI**
+**Hunyuan 3D 2.1 generation package for ComfyUI**
 
-Integrates multiple state-of-the-art 3D AI models: Hunyuan 3D 2.1 (Tencent), TRELLIS (Microsoft), with advanced mesh processing, texture generation, and flexible geometric operations.
+Integrates Tencent's Hunyuan 3D 2.1 for image-to-3D generation with PBR texturing, featuring both standard and modular pipelines.
 
 ## Features
 
 ### 3D Generation
 - **Hunyuan 3D 2.1**: Image-to-3D with PBR texturing, model caching (5-10x speedup)
-- **TRELLIS**: Image/text-to-3D with multi-view fusion, Gaussian splats, radiance fields
-- **Modular Pipeline**: Memory-efficient split DiT/VAE loading
-
-### Mesh Processing
-- **Flexible Operations**: 1-10 configurable operation slots with intermediate outputs
-- **Post-Processing**: Floater removal, face reduction, normal smoothing
-- **UV Unwrapping**: xatlas (fast) or Blender Smart UV Project
-- **Export**: GLB, OBJ, STL, PLY, 3MF, DAE, FBX
+- **Standard Pipeline**: Quick generation with all-in-one nodes
+- **Modular Pipeline**: Memory-efficient split DiT/VAE loading (andrea_nodes)
 
 ### Texture Generation
 - **PBR Multiview**: Albedo + metallic-roughness textures
 - **Conditioning Maps**: Normal/position map rendering
 - **Inpainting**: Fill UV texture holes
+- **Baking**: Multi-view texture baking
+
+### Mesh Operations
+- **Post-Processing**: Built-in mesh cleaning and optimization
+- **UV Unwrapping**: Custom Hunyuan UV unwrapper
+- **Export**: GLB, OBJ, STL, PLY, 3MF, DAE, FBX
 
 ### Interpolation
-- **Latent Blending**: VAE, Hunyuan3D, DINO embeddings
+- **Latent Blending**: Hunyuan3D latents, DINO embeddings
 - **SLERP/LERP**: Smooth transitions between meshes/images
 
 ## Installation
@@ -31,17 +31,17 @@ Integrates multiple state-of-the-art 3D AI models: Hunyuan 3D 2.1 (Tencent), TRE
 ### Quick Install
 ```bash
 cd ComfyUI/custom_nodes/
-git clone https://github.com/YOUR_USERNAME/ComfyUI-MeshCraft
-cd ComfyUI-MeshCraft
-python install.py  # Handles all dependencies and compilation
+git clone https://github.com/YOUR_USERNAME/ComfyUI-HunyuanX
+cd ComfyUI-HunyuanX
+pip install -r requirements.txt
 ```
 
 ### Via ComfyUI Manager
 1. Open ComfyUI Manager
-2. Search for "ComfyUI-MeshCraft"
+2. Search for "ComfyUI-HunyuanX"
 3. Click Install
 
-**Requirements**: Python 3.10+, PyTorch 2.5-2.8, NVIDIA GPU with CUDA (for full features)
+**Requirements**: Python 3.10+, PyTorch 2.5-2.8, NVIDIA GPU with CUDA (recommended 24GB+ VRAM)
 
 ---
 

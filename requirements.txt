@@ -1,54 +1,42 @@
-# PyTorch version compatible with Kaolin wheels (CUDA 12.8: cu128)
-# Kaolin 0.18.0 has wheels for: torch 2.5.0, 2.5.1, 2.6.0, 2.7.0, 2.7.1, 2.8.0
-# Install with: pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu128
-torch>=2.5.0,<=2.8.0
+# PyTorch (ComfyUI compatible)
+torch>=2.0.0
 torchvision
-torchaudio
 
-# Rendering/remeshing dependencies
-pyglet<2
-pynanoinstantmeshes  # Fast mesh remeshing
-trimesh
-fast-simplification  # For high-quality mesh decimation (trimesh.simplify_quadric_decimation)
-pymeshlab
-pygltflib
-xatlas
-open3d
-omegaconf
-pyyaml
-configargparse
-transformers
-diffusers
-accelerate
-opencv-python
-huggingface-hub
-hf-transfer  # Fast download accelerator for HuggingFace
-safetensors
-scikit-image
-pybind11
-timm
-meshlib
-rembg
-onnxruntime
-pytorch-lightning
+# Core 3D processing (REQUIRED)
+trimesh  # Core mesh operations
+pymeshlab  # Mesh post-processing in hy3dshape/hy3dpaint
+pygltflib  # GLB/GLTF export
+xatlas  # UV unwrapping (used by Hunyuan UV wrapper)
 
-# TRELLIS Dependencies (for 3D generation with granular pipeline control)
-imageio>=2.0.0
-imageio-ffmpeg
-einops>=0.7.0
-easydict
-plotly
-kaleido  # For static image export from plotly (SLAT visualizer)
-pyvista
-pymeshfix
-igraph
-scipy
-ninja
-plyfile
-diso
-git+https://github.com/EasternJournalist/utils3d.git@9a4eb15e4021b67b12c460c7057d642626897ec8
+# Image processing (REQUIRED)
+opencv-python  # Image operations
+numpy  # Array operations
+Pillow  # Image loading/saving
+rembg  # Background removal
+scikit-image  # Image processing utilities
 
-# Testing dependencies
+# Deep learning (REQUIRED)
+transformers  # DINO model loading
+diffusers  # Hunyuan diffusion models
+accelerate  # Model loading optimization
+timm  # Vision models
+einops>=0.7.0  # Tensor operations
+
+# Configuration (REQUIRED)
+omegaconf  # Config loading
+pyyaml  # YAML parsing
+
+# HuggingFace (REQUIRED)
+huggingface-hub  # Model downloading
+hf-transfer  # Fast download accelerator
+safetensors  # Model format
+
+# Optional but recommended
+open3d  # Advanced mesh operations
+libigl  # Geometry processing (used in some hy3dshape scripts)
+scipy  # Scientific computing
+
+# Testing only (optional)
 pytest>=8.0.0
 websocket-client>=1.0.0
-dash
+pyyaml  # For test config loading

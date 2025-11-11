@@ -1,0 +1,57 @@
+[project]
+name = "comfyui-hunyuanx"
+description = "Hunyuan 3D 2.1 image-to-3D generation nodes for ComfyUI with PBR texturing and model caching. Granular control for research."
+version = "1.0.0"
+license = {file = "LICENSE"}
+requires-python = ">=3.10"
+
+# Core dependencies for ComfyUI-HunyuanX
+dependencies = [
+    # PyTorch (ComfyUI compatible)
+    "torch>=2.0.0",
+    "torchvision",
+
+    # Core 3D processing
+    "trimesh",
+    "pymeshlab",
+    "pygltflib",
+    "xatlas",
+
+    # Image processing
+    "opencv-python",
+    "numpy",
+    "Pillow",
+    "rembg",
+    "scikit-image",
+
+    # Deep learning
+    "transformers",
+    "diffusers",
+    "accelerate",
+    "timm",
+    "einops>=0.7.0",
+
+    # Configuration
+    "omegaconf",
+    "pyyaml",
+
+    # HuggingFace
+    "huggingface-hub",
+    "hf-transfer",
+    "safetensors",
+
+    # Optional but recommended
+    "open3d",
+    "scipy",
+]
+
+[project.urls]
+Repository = "https://github.com/YOUR_USERNAME/ComfyUI-HunyuanX"
+Documentation = "https://github.com/YOUR_USERNAME/ComfyUI-HunyuanX#readme"
+"Bug Tracker" = "https://github.com/YOUR_USERNAME/ComfyUI-HunyuanX/issues"
+
+# Comfy Registry configuration
+[tool.comfy]
+PublisherId = "YOUR_PUBLISHER_ID"
+DisplayName = "ComfyUI-HunyuanX"
+Icon = ""
