@@ -196,7 +196,7 @@
     },
     {
       "id": 19,
-      "type": "Hy3D21CameraConfig",
+      "type": "HunyuanX_CameraConfig",
       "pos": [
         1414.2629765546856,
         -12.242998398436894
@@ -222,7 +222,7 @@
       "properties": {
         "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
         "ver": "dc84deb90a0c652be956e82799ebe60fc79590dc",
-        "Node name for S&R": "Hy3D21CameraConfig"
+        "Node name for S&R": "HunyuanX_CameraConfig"
       },
       "widgets_values": [
         "0, 90, 180, 270, 0, 180",
@@ -233,7 +233,7 @@
     },
     {
       "id": 21,
-      "type": "Hy3DBakeMultiViews",
+      "type": "HunyuanX_BakeMultiViews",
       "pos": [
         1889.3706223036604,
         563.5149850706441
@@ -317,13 +317,13 @@
       "properties": {
         "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
         "ver": "dc84deb90a0c652be956e82799ebe60fc79590dc",
-        "Node name for S&R": "Hy3DBakeMultiViews"
+        "Node name for S&R": "HunyuanX_BakeMultiViews"
       },
       "widgets_values": []
     },
     {
       "id": 49,
-      "type": "Hy3DInPaint",
+      "type": "HunyuanX_InPaint",
       "pos": [
         2379.0349609375,
         130
@@ -393,7 +393,7 @@
       "properties": {
         "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
         "ver": "dc84deb90a0c652be956e82799ebe60fc79590dc",
-        "Node name for S&R": "Hy3DInPaint"
+        "Node name for S&R": "HunyuanX_InPaint"
       },
       "widgets_values": [
         "asd"
@@ -602,7 +602,7 @@
     },
     {
       "id": 113,
-      "type": "Hy3D21ExportMesh",
+      "type": "HunyuanX_ExportMesh",
       "pos": [
         215.4429901055931,
         929.7993681172154
@@ -633,7 +633,7 @@
       "properties": {
         "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
         "ver": "dc84deb90a0c652be956e82799ebe60fc79590dc",
-        "Node name for S&R": "Hy3D21ExportMesh"
+        "Node name for S&R": "HunyuanX_ExportMesh"
       },
       "widgets_values": [
         "justdecoded",
@@ -712,7 +712,7 @@
     },
     {
       "id": 258,
-      "type": "Hy3DDecodeLatents",
+      "type": "HunyuanX_DecodeLatents",
       "pos": [
         -112.36145399823921,
         911.4895153112888
@@ -749,7 +749,7 @@
       "properties": {
         "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
         "ver": "dc84deb90a0c652be956e82799ebe60fc79590dc",
-        "Node name for S&R": "Hy3DDecodeLatents"
+        "Node name for S&R": "HunyuanX_DecodeLatents"
       },
       "widgets_values": [
         1.01,
@@ -762,7 +762,7 @@
     },
     {
       "id": 254,
-      "type": "Hy3DGenerateLatents",
+      "type": "HunyuanX_GenerateLatents",
       "pos": [
         -421.04843591366716,
         951.4738918160162
@@ -798,7 +798,7 @@
       "properties": {
         "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
         "ver": "dc84deb90a0c652be956e82799ebe60fc79590dc",
-        "Node name for S&R": "Hy3DGenerateLatents"
+        "Node name for S&R": "HunyuanX_GenerateLatents"
       },
       "widgets_values": [
         25,
@@ -810,7 +810,7 @@
     },
     {
       "id": 20,
-      "type": "Hy3DMultiViewsGenerator",
+      "type": "HunyuanX_MultiViewsGenerator",
       "pos": [
         1061.2690896671268,
         406.4117206744752
@@ -886,7 +886,7 @@
       "properties": {
         "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
         "ver": "dc84deb90a0c652be956e82799ebe60fc79590dc",
-        "Node name for S&R": "Hy3DMultiViewsGenerator"
+        "Node name for S&R": "HunyuanX_MultiViewsGenerator"
       },
       "widgets_values": [
         512,
@@ -901,7 +901,7 @@
     },
     {
       "id": 45,
-      "type": "Hy3D21MeshUVWrap",
+      "type": "HunyuanX_MeshUVWrap",
       "pos": [
         724.8544302488747,
         717.2710855115519
@@ -932,7 +932,7 @@
       "properties": {
         "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
         "ver": "dc84deb90a0c652be956e82799ebe60fc79590dc",
-        "Node name for S&R": "Hy3D21MeshUVWrap"
+        "Node name for S&R": "HunyuanX_MeshUVWrap"
       },
       "widgets_values": []
     }

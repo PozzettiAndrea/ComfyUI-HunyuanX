@@ -52,35 +52,35 @@ pip install -r requirements.txt
 **Model Loaders**
 | Node | Purpose |
 |------|---------|
-| `Hy3D21VAELoader` | Load Hunyuan VAE model |
-| `Hy3D21CameraConfig` | Configure camera parameters |
+| `HunyuanX_VAELoader` | Load Hunyuan VAE model |
+| `HunyuanX_CameraConfig` | Configure camera parameters |
 
 **Input Nodes**
 | Node | Purpose |
 |------|---------|
-| `Hy3D21LoadImageWithTransparency` | Load RGBA image |
-| `Hy3D21ImageWithAlphaInput` | Direct RGBA input |
+| `HunyuanX_LoadImageWithTransparency` | Load RGBA image |
+| `HunyuanX_ImageWithAlphaInput` | Direct RGBA input |
 
 **Core Pipeline**
 | Node | Purpose |
 |------|---------|
-| `Hy3DMeshGenerator` | Generate 3D mesh from image (DiT Flow Matching) |
-| `Hy3D21VAEDecode` | Decode latents to mesh |
-| `Hy3D21PostprocessMesh` | Clean and optimize mesh |
+| `HunyuanX_MeshGenerator` | Generate 3D mesh from image (DiT Flow Matching) |
+| `HunyuanX_VAEDecode` | Decode latents to mesh |
+| `HunyuanX_PostprocessMesh` | Clean and optimize mesh |
 
 **Texture Generation**
 | Node | Purpose |
 |------|---------|
-| `Hy3DMultiViewsGenerator` | Generate multi-view textures |
-| `Hy3DBakeMultiViews` | Bake textures onto mesh |
-| `Hy3DInPaint` | Inpaint/complete textures |
+| `HunyuanX_MultiViewsGenerator` | Generate multi-view textures |
+| `HunyuanX_BakeMultiViews` | Bake textures onto mesh |
+| `HunyuanX_InPaint` | Inpaint/complete textures |
 
 **Mesh Operations**
 | Node | Purpose |
 |------|---------|
-| `Hy3D21MeshUVWrap` | UV unwrap mesh |
-| `Hy3D21LoadMesh` | Load mesh from file |
-| `Hy3D21ExportMesh` | Export to various formats |
+| `HunyuanX_MeshUVWrap` | UV unwrap mesh |
+| `HunyuanX_LoadMesh` | Load mesh from file |
+| `HunyuanX_ExportMesh` | Export to various formats |
 
 ---
 
@@ -91,27 +91,27 @@ For fine-grained control over the generation process:
 **Image Preprocessing**
 | Node | Purpose |
 |------|---------|
-| `PrepareImageForDINO` | Preprocess images for DINO encoder |
+| `HunyuanX_PrepareImageForDINO` | Preprocess images for DINO encoder |
 
 **Model Loaders**
 | Node | Purpose |
 |------|---------|
-| `LoadDinoModel` | Load DINO v2 vision encoder |
-| `LoadHunyuanDiT` | Load Hunyuan DiT (diffusion transformer) |
-| `LoadHunyuanVAE` | Load Hunyuan VAE |
+| `HunyuanX_LoadDinoModel` | Load DINO v2 vision encoder |
+| `HunyuanX_LoadDiT` | Load Hunyuan DiT (diffusion transformer) |
+| `HunyuanX_LoadVAE` | Load Hunyuan VAE |
 
 **Modular Pipeline**
 | Node | Purpose |
 |------|---------|
-| `EncodeDINO` | Encode image to DINO embeddings |
-| `Hy3DGenerateLatents` | Generate mesh latents from embeddings |
-| `Hy3DDecodeLatents` | Decode latents to mesh |
-| `Hy3DImageToLatents` | All-in-one convenience node |
+| `HunyuanX_EncodeDINO` | Encode image to DINO embeddings |
+| `HunyuanX_GenerateLatents` | Generate mesh latents from embeddings |
+| `HunyuanX_DecodeLatents` | Decode latents to mesh |
+| `HunyuanX_ImageToLatents` | All-in-one convenience node |
 
 **Visualization**
 | Node | Purpose |
 |------|---------|
-| `PreviewTrimesh` | Interactive 3D mesh preview |
+| `HunyuanX_PreviewTrimesh` | Interactive 3D mesh preview |
 
 ---
 

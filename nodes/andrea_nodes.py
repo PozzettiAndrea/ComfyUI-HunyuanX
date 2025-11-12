@@ -1315,25 +1315,25 @@ class PreviewTrimesh:
 # =============================================================================
 
 NODE_CLASS_MAPPINGS = {
-    "PrepareImageForDINO": PrepareImageForDINO,
-    "LoadDinoModel": LoadDinoModel,
-    "EncodeDINO": EncodeDINO,
-    "LoadHunyuanDiT": LoadHunyuanDiT,
-    "LoadHunyuanVAE": LoadHunyuanVAE,
-    "Hy3DGenerateLatents": Hy3DGenerateLatents,
-    "Hy3DDecodeLatents": Hy3DDecodeLatents,
-    "Hy3DImageToLatents": Hy3DImageToLatents,
-    "PreviewTrimesh": PreviewTrimesh,
+    "HunyuanX_PrepareImageForDINO": PrepareImageForDINO,
+    "HunyuanX_LoadDinoModel": LoadDinoModel,
+    "HunyuanX_EncodeDINO": EncodeDINO,
+    "HunyuanX_LoadDiT": LoadHunyuanDiT,
+    "HunyuanX_LoadVAE": LoadHunyuanVAE,
+    "HunyuanX_GenerateLatents": Hy3DGenerateLatents,
+    "HunyuanX_DecodeLatents": Hy3DDecodeLatents,
+    "HunyuanX_ImageToLatents": Hy3DImageToLatents,
+    "HunyuanX_PreviewTrimesh": PreviewTrimesh,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "PrepareImageForDINO": "Prepare Image for DINO",
-    "LoadDinoModel": "Load DINO v2 Model",
-    "EncodeDINO": "Encode with DINO v2",
-    "LoadHunyuanDiT": "Load Hunyuan DiT Model",
-    "LoadHunyuanVAE": "Load Hunyuan VAE",
-    "Hy3DGenerateLatents": "Hunyuan 3D: Generate Latents",
-    "Hy3DDecodeLatents": "Hunyuan 3D: Decode Latents",
-    "Hy3DImageToLatents": "Hunyuan 3D: Image to Latents (Simple)",
-    "PreviewTrimesh": "Preview Trimesh",
+    "HunyuanX_PrepareImageForDINO": "Hunyuan3D: Prepare Image for DINO",
+    "HunyuanX_LoadDinoModel": "Hunyuan3D: Load DINO v2 Model",
+    "HunyuanX_EncodeDINO": "Hunyuan3D: Encode with DINO v2",
+    "HunyuanX_LoadDiT": "Hunyuan3D: Load DiT Model",
+    "HunyuanX_LoadVAE": "Hunyuan3D: Load VAE",
+    "HunyuanX_GenerateLatents": "Hunyuan3D: Generate Latents",
+    "HunyuanX_DecodeLatents": "Hunyuan3D: Decode Latents",
+    "HunyuanX_ImageToLatents": "Hunyuan3D: Image to Latents",
+    "HunyuanX_PreviewTrimesh": "Hunyuan3D: Preview Trimesh",
 }

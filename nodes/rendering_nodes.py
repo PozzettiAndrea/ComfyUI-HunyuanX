@@ -1077,21 +1077,21 @@ class ApplyAndSaveTexturedMesh:
 # =============================================================================
 
 NODE_CLASS_MAPPINGS = {
-    "MeshCraft_LoadHunyuanMultiViewModel": LoadHunyuanMultiViewModel,
-    "MeshCraft_RenderConditioningMaps": RenderConditioningMaps,
-    "MeshCraft_RenderRGBMultiview": RenderRGBMultiview,
-    "MeshCraft_GenerateMultiviewPBR": GenerateMultiviewPBR,
-    "MeshCraft_BakeMultiviewTextures": BakeMultiviewTextures,
-    "MeshCraft_InpaintTextures": InpaintTextures,
-    "MeshCraft_ApplyAndSaveTexturedMesh": ApplyAndSaveTexturedMesh,
+    "HunyuanX_LoadMultiViewModel": LoadHunyuanMultiViewModel,
+    "HunyuanX_RenderConditioningMaps": RenderConditioningMaps,
+    "HunyuanX_RenderRGBMultiview": RenderRGBMultiview,
+    "HunyuanX_GenerateMultiviewPBR": GenerateMultiviewPBR,
+    "HunyuanX_BakeMultiviewTextures": BakeMultiviewTextures,
+    "HunyuanX_InpaintTextures": InpaintTextures,
+    "HunyuanX_ApplyAndSaveTexturedMesh": ApplyAndSaveTexturedMesh,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "MeshCraft_LoadHunyuanMultiViewModel": "Load Hunyuan Multiview Model",
-    "MeshCraft_RenderConditioningMaps": "Render Conditioning Maps (Normals + Positions)",
-    "MeshCraft_RenderRGBMultiview": "Render RGB Multiview Images",
-    "MeshCraft_GenerateMultiviewPBR": "Generate Multiview PBR Textures",
-    "MeshCraft_BakeMultiviewTextures": "Bake Multiview Textures",
-    "MeshCraft_InpaintTextures": "Inpaint Textures",
-    "MeshCraft_ApplyAndSaveTexturedMesh": "Apply and Save Textured Mesh",
+    "HunyuanX_LoadMultiViewModel": "Hunyuan3D: Load Multiview Model",
+    "HunyuanX_RenderConditioningMaps": "Hunyuan3D: Render Conditioning Maps",
+    "HunyuanX_RenderRGBMultiview": "Hunyuan3D: Render RGB Multiview",
+    "HunyuanX_GenerateMultiviewPBR": "Hunyuan3D: Generate Multiview PBR",
+    "HunyuanX_BakeMultiviewTextures": "Hunyuan3D: Bake Multiview Textures",
+    "HunyuanX_InpaintTextures": "Hunyuan3D: Inpaint Textures",
+    "HunyuanX_ApplyAndSaveTexturedMesh": "Hunyuan3D: Apply and Save Textured Mesh",
 }
