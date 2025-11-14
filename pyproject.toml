@@ -30,6 +30,7 @@ dependencies = [
     "accelerate",
     "timm",
     "einops>=0.7.0",
+    "pytorch_lightning",
 
     # Configuration
     "omegaconf",
