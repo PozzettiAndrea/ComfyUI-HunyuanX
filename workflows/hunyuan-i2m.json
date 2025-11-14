@@ -1,80 +1,255 @@
 {
   "id": "7c16f0a7-a181-45de-a715-20dd6ee7bbed",
   "revision": 0,
-  "last_node_id": 269,
-  "last_link_id": 62,
+  "last_node_id": 285,
+  "last_link_id": 94,
   "nodes": [
     {
-      "id": 50,
-      "type": "PreviewImage",
+      "id": 271,
+      "type": "HunyuanX_LoadDinoModel",
       "pos": [
-        2749.1072265625,
-        130
+        -1450.8777681965137,
+        1286.0938679513488
       ],
       "size": [
-        140,
-        246
+        312.347265625,
+        82
       ],
       "flags": {},
-      "order": 17,
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "dino_model",
+          "type": "DINO_MODEL",
+          "links": [
+            64
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "PozzettiAndrea/ComfyUI-HunyuanX",
+        "ver": "a00fb88034a72c59a6345b1487a246ce85ebbc0b",
+        "Node name for S&R": "HunyuanX_LoadDinoModel"
+      },
+      "widgets_values": [
+        "large",
+        true
+      ]
+    },
+    {
+      "id": 273,
+      "type": "HunyuanX_LoadDiT",
+      "pos": [
+        -819.941055291803,
+        832.7995305246632
+      ],
+      "size": [
+        280.4439453125,
+        106
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "dit_model",
+          "type": "HY3D_DIT_MODEL",
+          "links": [
+            65
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "PozzettiAndrea/ComfyUI-HunyuanX",
+        "ver": "a00fb88034a72c59a6345b1487a246ce85ebbc0b",
+        "Node name for S&R": "HunyuanX_LoadDiT"
+      },
+      "widgets_values": [
+        "tencent/Hunyuan3D-2.1 (fp16)",
+        "sageattn",
+        true
+      ]
+    },
+    {
+      "id": 270,
+      "type": "HunyuanX_EncodeDINO",
+      "pos": [
+        -1164.8679749503888,
+        1164.9183792240185
+      ],
+      "size": [
+        255.45078125,
+        46
+      ],
+      "flags": {},
+      "order": 5,
       "mode": 0,
       "inputs": [
         {
-          "name": "images",
+          "name": "dino_model",
+          "type": "DINO_MODEL",
+          "link": 64
+        },
+        {
+          "name": "image",
           "type": "IMAGE",
-          "link": 17
+          "link": 63
         }
       ],
-      "outputs": [],
+      "outputs": [
+        {
+          "name": "embedding",
+          "type": "DINO_EMBEDDING",
+          "links": [
+            66
+          ]
+        }
+      ],
       "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.3.67",
-        "Node name for S&R": "PreviewImage"
-      },
-      "widgets_values": []
+        "aux_id": "PozzettiAndrea/ComfyUI-HunyuanX",
+        "ver": "a00fb88034a72c59a6345b1487a246ce85ebbc0b",
+        "Node name for S&R": "HunyuanX_EncodeDINO"
+      }
     },
     {
-      "id": 51,
-      "type": "PreviewImage",
+      "id": 272,
+      "type": "HunyuanX_GenerateLatents",
       "pos": [
-        2749.1072265625,
-        286
+        -828.5168941079833,
+        1042.2950216056454
       ],
       "size": [
-        140,
-        246
+        289.80234375,
+        174
       ],
       "flags": {},
-      "order": 18,
+      "order": 6,
       "mode": 0,
       "inputs": [
         {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 18
+          "name": "dit_model",
+          "type": "HY3D_DIT_MODEL",
+          "link": 65
+        },
+        {
+          "name": "dino_embedding",
+          "type": "DINO_EMBEDDING",
+          "link": 66
         }
       ],
-      "outputs": [],
+      "outputs": [
+        {
+          "name": "latents",
+          "type": "HY3DLATENT",
+          "links": [
+            67
+          ]
+        }
+      ],
       "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.3.67",
-        "Node name for S&R": "PreviewImage"
+        "aux_id": "PozzettiAndrea/ComfyUI-HunyuanX",
+        "ver": "a00fb88034a72c59a6345b1487a246ce85ebbc0b",
+        "Node name for S&R": "HunyuanX_GenerateLatents"
       },
-      "widgets_values": []
+      "widgets_values": [
+        50,
+        5,
+        748568095654114,
+        "randomize",
+        ""
+      ]
     },
     {
-      "id": 104,
+      "id": 274,
+      "type": "HunyuanX_LoadVAE",
+      "pos": [
+        -518.5615768946013,
+        881.8043237599804
+      ],
+      "size": [
+        270,
+        82
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "vae",
+          "type": "HY3DVAE",
+          "links": [
+            68
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "PozzettiAndrea/ComfyUI-HunyuanX",
+        "ver": "a00fb88034a72c59a6345b1487a246ce85ebbc0b",
+        "Node name for S&R": "HunyuanX_LoadVAE"
+      },
+      "widgets_values": [
+        "tencent/Hunyuan3D-2.1 VAE (fp16)",
+        true
+      ]
+    },
+    {
+      "id": 276,
+      "type": "HunyuanX_ExportMesh",
+      "pos": [
+        -176.75314407826278,
+        1027.5935836350495
+      ],
+      "size": [
+        270,
+        106
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "trimesh",
+          "type": "TRIMESH",
+          "link": 69
+        }
+      ],
+      "outputs": [
+        {
+          "name": "glb_path",
+          "type": "STRING",
+          "links": [
+            70
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "PozzettiAndrea/ComfyUI-HunyuanX",
+        "ver": "a00fb88034a72c59a6345b1487a246ce85ebbc0b",
+        "Node name for S&R": "HunyuanX_ExportMesh"
+      },
+      "widgets_values": [
+        "3D/Hy3D",
+        "glb",
+        true
+      ]
+    },
+    {
+      "id": 277,
       "type": "Preview3D",
       "pos": [
-        2749.1072265625,
-        442
+        171.18088789249055,
+        1022.6931043115183
       ],
       "size": [
         400,
         550
       ],
       "flags": {},
-      "order": 19,
+      "order": 11,
       "mode": 0,
       "inputs": [
         {
@@ -89,359 +264,33 @@
           "widget": {
             "name": "model_file"
           },
-          "link": 19
+          "link": 70
         }
       ],
       "outputs": [],
       "properties": {
         "cnr_id": "comfy-core",
-        "ver": "0.3.67",
-        "Node name for S&R": "Preview3D",
-        "Camera Info": {
-          "position": {
-            "x": -0.8429405750025818,
-            "y": 8.121726568068334,
-            "z": 3.023999065266001
-          },
-          "target": {
-            "x": 0,
-            "y": 2.5,
-            "z": 0
-          },
-          "zoom": 1,
-          "cameraType": "perspective"
-        },
-        "Last Time Model File": "asd.glb"
+        "ver": "0.3.68",
+        "Node name for S&R": "Preview3D"
       },
       "widgets_values": [
-        "asd.glb",
+        "",
         ""
-      ]
-    },
-    {
-      "id": 252,
-      "type": "EncodeDINO",
-      "pos": [
-        -762.4621467706991,
-        1088.3937224925774
-      ],
-      "size": [
-        173.733984375,
-        46
-      ],
-      "flags": {},
-      "order": 5,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "dino_model",
-          "type": "DINO_MODEL",
-          "link": 34
-        },
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 52
-        }
-      ],
-      "outputs": [
-        {
-          "name": "embedding",
-          "type": "DINO_EMBEDDING",
-          "links": [
-            35
-          ]
-        }
-      ],
-      "properties": {
-        "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
-        "ver": "dc84deb90a0c652be956e82799ebe60fc79590dc",
-        "Node name for S&R": "EncodeDINO"
-      },
-      "widgets_values": []
-    },
-    {
-      "id": 259,
-      "type": "LoadHunyuanVAE",
-      "pos": [
-        -403.4737270898432,
-        787.8201405156248
-      ],
-      "size": [
-        270,
-        82
-      ],
-      "flags": {},
-      "order": 0,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "vae",
-          "type": "HY3DVAE",
-          "links": [
-            38
-          ]
-        }
-      ],
-      "properties": {
-        "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
-        "ver": "dc84deb90a0c652be956e82799ebe60fc79590dc",
-        "Node name for S&R": "LoadHunyuanVAE"
-      },
-      "widgets_values": [
-        "Hunyuan3D-vae-v2-1-fp16.ckpt",
-        true
-      ]
-    },
-    {
-      "id": 19,
-      "type": "HunyuanX_CameraConfig",
-      "pos": [
-        1414.2629765546856,
-        -12.242998398436894
-      ],
-      "size": [
-        299.1197265625,
-        130
-      ],
-      "flags": {},
-      "order": 1,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "camera_config",
-          "type": "HY3D21CAMERA",
-          "links": [
-            2,
-            5
-          ]
-        }
-      ],
-      "properties": {
-        "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
-        "ver": "dc84deb90a0c652be956e82799ebe60fc79590dc",
-        "Node name for S&R": "HunyuanX_CameraConfig"
-      },
-      "widgets_values": [
-        "0, 90, 180, 270, 0, 180",
-        "0, 0, 0, 0, 90, -90",
-        "1, 0.5, 1, 0.5, 1, 1",
-        1.1
-      ]
-    },
-    {
-      "id": 21,
-      "type": "HunyuanX_BakeMultiViews",
-      "pos": [
-        1889.3706223036604,
-        563.5149850706441
-      ],
-      "size": [
-        247.4185546875,
-        146
-      ],
-      "flags": {},
-      "order": 15,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "pipeline",
-          "type": "HY3DPIPELINE",
-          "link": 4
-        },
-        {
-          "name": "camera_config",
-          "type": "HY3D21CAMERA",
-          "link": 5
-        },
-        {
-          "name": "albedo",
-          "type": "IMAGE",
-          "link": 6
-        },
-        {
-          "name": "mr",
-          "type": "IMAGE",
-          "link": 7
-        }
-      ],
-      "outputs": [
-        {
-          "name": "pipeline",
-          "type": "HY3DPIPELINE",
-          "links": [
-            12
-          ]
-        },
-        {
-          "name": "albedo",
-          "type": "NPARRAY",
-          "links": [
-            13
-          ]
-        },
-        {
-          "name": "albedo_mask",
-          "type": "NPARRAY",
-          "links": [
-            14
-          ]
-        },
-        {
-          "name": "mr",
-          "type": "NPARRAY",
-          "links": [
-            15
-          ]
-        },
-        {
-          "name": "mr_mask",
-          "type": "NPARRAY",
-          "links": [
-            16
-          ]
-        },
-        {
-          "name": "albedo_texture",
-          "type": "IMAGE",
-          "links": null
-        },
-        {
-          "name": "mr_texture",
-          "type": "IMAGE",
-          "links": null
-        }
-      ],
-      "properties": {
-        "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
-        "ver": "dc84deb90a0c652be956e82799ebe60fc79590dc",
-        "Node name for S&R": "HunyuanX_BakeMultiViews"
-      },
-      "widgets_values": []
-    },
-    {
-      "id": 49,
-      "type": "HunyuanX_InPaint",
-      "pos": [
-        2379.0349609375,
-        130
-      ],
-      "size": [
-        270.072265625,
-        138
-      ],
-      "flags": {},
-      "order": 16,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "pipeline",
-          "type": "HY3DPIPELINE",
-          "link": 12
-        },
-        {
-          "name": "albedo",
-          "type": "NPARRAY",
-          "link": 13
-        },
-        {
-          "name": "albedo_mask",
-          "type": "NPARRAY",
-          "link": 14
-        },
-        {
-          "name": "mr",
-          "type": "NPARRAY",
-          "link": 15
-        },
-        {
-          "name": "mr_mask",
-          "type": "NPARRAY",
-          "link": 16
-        }
-      ],
-      "outputs": [
-        {
-          "name": "albedo",
-          "type": "IMAGE",
-          "links": [
-            17
-          ]
-        },
-        {
-          "name": "mr",
-          "type": "IMAGE",
-          "links": [
-            18
-          ]
-        },
-        {
-          "name": "trimesh",
-          "type": "TRIMESH",
-          "links": null
-        },
-        {
-          "name": "output_glb_path",
-          "type": "STRING",
-          "links": [
-            19
-          ]
-        }
-      ],
-      "properties": {
-        "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
-        "ver": "dc84deb90a0c652be956e82799ebe60fc79590dc",
-        "Node name for S&R": "HunyuanX_InPaint"
-      },
-      "widgets_values": [
-        "asd"
-      ]
-    },
-    {
-      "id": 46,
-      "type": "SaveImage",
-      "pos": [
-        2006.420651464099,
-        24.454506126205455
-      ],
-      "size": [
-        270,
-        270
-      ],
-      "flags": {},
-      "order": 14,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 10
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.3.67"
-      },
-      "widgets_values": [
-        "ComfyUI"
       ]
     },
     {
       "id": 240,
       "type": "LoadImage",
       "pos": [
-        -1799.6910129640587,
-        786.4271260132856
+        -1183.014694890826,
+        755.2968311105504
       ],
       "size": [
         274.080078125,
         314.0000000000001
       ],
       "flags": {},
-      "order": 2,
+      "order": 3,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -449,8 +298,8 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            52,
-            53
+            63,
+            94
           ]
         },
         {
@@ -470,60 +319,100 @@
       ]
     },
     {
-      "id": 265,
-      "type": "MeshCraft_RemoveDegenerate",
+      "id": 280,
+      "type": "HunyuanX_MeshUVWrap",
       "pos": [
-        36.958698741018196,
-        737.3003370857989
+        626.9884024494517,
+        897.3417723300776
       ],
       "size": [
-        211.09921875,
+        216.2740234375,
         26
       ],
       "flags": {},
-      "order": 9,
+      "order": 10,
       "mode": 0,
       "inputs": [
         {
           "name": "trimesh",
           "type": "TRIMESH",
-          "link": 57
+          "link": 76
         }
       ],
       "outputs": [
         {
           "name": "trimesh",
           "type": "TRIMESH",
-          "links": [
-            58
-          ]
+          "links": null
         }
       ],
       "properties": {
-        "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
-        "ver": "a8e0a5c652ddaf40ff5cb8764471427a2a4494ff",
-        "Node name for S&R": "MeshCraft_RemoveDegenerate"
+        "aux_id": "PozzettiAndrea/ComfyUI-HunyuanX",
+        "ver": "a00fb88034a72c59a6345b1487a246ce85ebbc0b",
+        "Node name for S&R": "HunyuanX_MeshUVWrap"
       }
     },
     {
-      "id": 264,
-      "type": "MeshCraft_ReduceFaces",
+      "id": 279,
+      "type": "HunyuanX_CameraConfig",
       "pos": [
-        262.5310402328655,
-        629.3603439383655
+        -416.07862156427746,
+        518.657232604163
       ],
       "size": [
-        270,
-        58
+        275.7681640625,
+        130
       ],
       "flags": {},
-      "order": 11,
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "camera_config",
+          "type": "HY3D21CAMERA",
+          "links": [
+            75,
+            80
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "PozzettiAndrea/ComfyUI-HunyuanX",
+        "ver": "a00fb88034a72c59a6345b1487a246ce85ebbc0b",
+        "Node name for S&R": "HunyuanX_CameraConfig"
+      },
+      "widgets_values": [
+        "0, 90, 180, 270, 0, 180",
+        "0, 0, 0, 0, 90, -90",
+        "1, 0.1, 0.5, 0.1, 0.05, 0.05",
+        1
+      ]
+    },
+    {
+      "id": 275,
+      "type": "HunyuanX_DecodeLatents",
+      "pos": [
+        -491.6089406151766,
+        1021.4679844806349
+      ],
+      "size": [
+        279.68515625,
+        198
+      ],
+      "flags": {},
+      "order": 7,
       "mode": 0,
       "inputs": [
         {
-          "name": "trimesh",
-          "type": "TRIMESH",
-          "link": 58
+          "name": "vae",
+          "type": "HY3DVAE",
+          "link": 68
+        },
+        {
+          "name": "latents",
+          "type": "HY3DLATENT",
+          "link": 67
         }
       ],
       "outputs": [
@@ -531,32 +420,39 @@
           "name": "trimesh",
           "type": "TRIMESH",
           "links": [
-            56
+            69,
+            74,
+            76
           ]
         }
       ],
       "properties": {
-        "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
-        "ver": "a8e0a5c652ddaf40ff5cb8764471427a2a4494ff",
-        "Node name for S&R": "MeshCraft_ReduceFaces"
+        "aux_id": "PozzettiAndrea/ComfyUI-HunyuanX",
+        "ver": "a00fb88034a72c59a6345b1487a246ce85ebbc0b",
+        "Node name for S&R": "HunyuanX_DecodeLatents"
       },
       "widgets_values": [
-        200100
+        1.01,
+        384,
+        0,
+        "mc",
+        8000,
+        true
       ]
     },
     {
-      "id": 119,
+      "id": 285,
       "type": "Preview3D",
       "pos": [
-        385.6298066186713,
-        1149.8010793728213
+        1294.7367416920526,
+        653.2351939428092
       ],
       "size": [
-        792.9141435916971,
-        687.5287133885754
+        400,
+        550
       ],
       "flags": {},
-      "order": 10,
+      "order": 14,
       "mode": 0,
       "inputs": [
         {
@@ -571,272 +467,128 @@
           "widget": {
             "name": "model_file"
           },
-          "link": 22
+          "link": 89
         }
       ],
       "outputs": [],
       "properties": {
         "cnr_id": "comfy-core",
-        "ver": "0.3.67",
-        "Node name for S&R": "Preview3D",
-        "Camera Info": {
-          "position": {
-            "x": 8.445230808612422,
-            "y": 9.91203894593614,
-            "z": 8.445230808674077
-          },
-          "target": {
-            "x": 0,
-            "y": 2.5,
-            "z": 0
-          },
-          "zoom": 1,
-          "cameraType": "perspective"
-        },
-        "Last Time Model File": "justdecoded_00004_.stl"
+        "ver": "0.3.68",
+        "Node name for S&R": "Preview3D"
       },
       "widgets_values": [
-        "justdecoded_00004_.stl",
+        "",
         ""
       ]
     },
     {
-      "id": 113,
-      "type": "HunyuanX_ExportMesh",
+      "id": 283,
+      "type": "HunyuanX_InPaint",
       "pos": [
-        215.4429901055931,
-        929.7993681172154
+        948.6472928475891,
+        572.2355357026157
       ],
       "size": [
-        283.554296875,
-        106
-      ],
-      "flags": {},
-      "order": 8,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "trimesh",
-          "type": "TRIMESH",
-          "link": 21
-        }
-      ],
-      "outputs": [
-        {
-          "name": "glb_path",
-          "type": "STRING",
-          "links": [
-            22
-          ]
-        }
-      ],
-      "properties": {
-        "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
-        "ver": "dc84deb90a0c652be956e82799ebe60fc79590dc",
-        "Node name for S&R": "HunyuanX_ExportMesh"
-      },
-      "widgets_values": [
-        "justdecoded",
-        "stl",
-        true
-      ]
-    },
-    {
-      "id": 251,
-      "type": "LoadDinoModel",
-      "pos": [
-        -1089.8730602026606,
-        1288.2939664628238
-      ],
-      "size": [
-        270,
-        82
-      ],
-      "flags": {},
-      "order": 3,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "dino_model",
-          "type": "DINO_MODEL",
-          "links": [
-            34
-          ]
-        }
-      ],
-      "properties": {
-        "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
-        "ver": "dc84deb90a0c652be956e82799ebe60fc79590dc",
-        "Node name for S&R": "LoadDinoModel"
-      },
-      "widgets_values": [
-        "large",
-        true
-      ]
-    },
-    {
-      "id": 255,
-      "type": "LoadHunyuanDiT",
-      "pos": [
-        -761.9424708650457,
-        893.1851668649732
-      ],
-      "size": [
-        270,
-        106
-      ],
-      "flags": {},
-      "order": 4,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "dit_model",
-          "type": "HY3D_DIT_MODEL",
-          "links": [
-            36
-          ]
-        }
-      ],
-      "properties": {
-        "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
-        "ver": "dc84deb90a0c652be956e82799ebe60fc79590dc",
-        "Node name for S&R": "LoadHunyuanDiT"
-      },
-      "widgets_values": [
-        "hunyuan3d-dit-v2-1-fp16.ckpt",
-        "sageattn",
-        true
-      ]
-    },
-    {
-      "id": 258,
-      "type": "HunyuanX_DecodeLatents",
-      "pos": [
-        -112.36145399823921,
-        911.4895153112888
-      ],
-      "size": [
-        283.5748046875,
-        198
-      ],
-      "flags": {},
-      "order": 7,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "vae",
-          "type": "HY3DVAE",
-          "link": 38
-        },
-        {
-          "name": "latents",
-          "type": "HY3DLATENT",
-          "link": 37
-        }
-      ],
-      "outputs": [
-        {
-          "name": "trimesh",
-          "type": "TRIMESH",
-          "links": [
-            21,
-            57
-          ]
-        }
-      ],
-      "properties": {
-        "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
-        "ver": "dc84deb90a0c652be956e82799ebe60fc79590dc",
-        "Node name for S&R": "HunyuanX_DecodeLatents"
-      },
-      "widgets_values": [
-        1.01,
-        384,
-        0,
-        "dmc",
-        8000,
-        true
-      ]
-    },
-    {
-      "id": 254,
-      "type": "HunyuanX_GenerateLatents",
-      "pos": [
-        -421.04843591366716,
-        951.4738918160162
-      ],
-      "size": [
-        293.6919921875,
-        174
-      ],
-      "flags": {},
-      "order": 6,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "dit_model",
-          "type": "HY3D_DIT_MODEL",
-          "link": 36
-        },
-        {
-          "name": "dino_embedding",
-          "type": "DINO_EMBEDDING",
-          "link": 35
-        }
-      ],
-      "outputs": [
-        {
-          "name": "latents",
-          "type": "HY3DLATENT",
-          "links": [
-            37
-          ]
-        }
-      ],
-      "properties": {
-        "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
-        "ver": "dc84deb90a0c652be956e82799ebe60fc79590dc",
-        "Node name for S&R": "HunyuanX_GenerateLatents"
-      },
-      "widgets_values": [
-        25,
-        5,
-        42,
-        "fixed",
-        ""
-      ]
-    },
-    {
-      "id": 20,
-      "type": "HunyuanX_MultiViewsGenerator",
-      "pos": [
-        1061.2690896671268,
-        406.4117206744752
-      ],
-      "size": [
-        338.542578125,
-        346
+        270.072265625,
+        138
       ],
       "flags": {},
       "order": 13,
       "mode": 0,
       "inputs": [
         {
+          "name": "pipeline",
+          "type": "HY3DPIPELINE",
+          "link": 88
+        },
+        {
+          "name": "albedo",
+          "type": "NPARRAY",
+          "link": 92
+        },
+        {
+          "name": "albedo_mask",
+          "type": "NPARRAY",
+          "link": 91
+        },
+        {
+          "name": "mr",
+          "type": "NPARRAY",
+          "link": 87
+        },
+        {
+          "name": "mr_mask",
+          "type": "NPARRAY",
+          "link": 93
+        }
+      ],
+      "outputs": [
+        {
+          "name": "albedo",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "name": "mr",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
           "name": "trimesh",
           "type": "TRIMESH",
-          "link": 1
+          "links": null
+        },
+        {
+          "name": "output_glb_path",
+          "type": "STRING",
+          "links": [
+            89
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "PozzettiAndrea/ComfyUI-HunyuanX",
+        "ver": "a00fb88034a72c59a6345b1487a246ce85ebbc0b",
+        "Node name for S&R": "HunyuanX_InPaint"
+      },
+      "widgets_values": [
+        "asd"
+      ]
+    },
+    {
+      "id": 281,
+      "type": "HunyuanX_BakeMultiViews",
+      "pos": [
+        692.7949952933618,
+        572.7515583653449
+      ],
+      "size": [
+        224.0669921875,
+        146
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "pipeline",
+          "type": "HY3DPIPELINE",
+          "link": 81
         },
         {
           "name": "camera_config",
           "type": "HY3D21CAMERA",
-          "link": 2
+          "link": 80
         },
         {
-          "name": "image",
+          "name": "albedo",
           "type": "IMAGE",
-          "link": 53
+          "link": 78
+        },
+        {
+          "name": "mr",
+          "type": "IMAGE",
+          "link": 79
         }
       ],
       "outputs": [
@@ -844,22 +596,105 @@
           "name": "pipeline",
           "type": "HY3DPIPELINE",
           "links": [
-            4
+            88
+          ]
+        },
+        {
+          "name": "albedo",
+          "type": "NPARRAY",
+          "links": [
+            92
+          ]
+        },
+        {
+          "name": "albedo_mask",
+          "type": "NPARRAY",
+          "links": [
+            91
+          ]
+        },
+        {
+          "name": "mr",
+          "type": "NPARRAY",
+          "links": [
+            87
+          ]
+        },
+        {
+          "name": "mr_mask",
+          "type": "NPARRAY",
+          "links": [
+            93
+          ]
+        },
+        {
+          "name": "albedo_texture",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "name": "mr_texture",
+          "type": "IMAGE",
+          "links": []
+        }
+      ],
+      "properties": {
+        "aux_id": "PozzettiAndrea/ComfyUI-HunyuanX",
+        "ver": "a00fb88034a72c59a6345b1487a246ce85ebbc0b",
+        "Node name for S&R": "HunyuanX_BakeMultiViews"
+      }
+    },
+    {
+      "id": 278,
+      "type": "HunyuanX_MultiViewsGenerator",
+      "pos": [
+        243.16133341221956,
+        513.486233492668
+      ],
+      "size": [
+        315.191015625,
+        346
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "trimesh",
+          "type": "TRIMESH",
+          "link": 74
+        },
+        {
+          "name": "camera_config",
+          "type": "HY3D21CAMERA",
+          "link": 75
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 94
+        }
+      ],
+      "outputs": [
+        {
+          "name": "pipeline",
+          "type": "HY3DPIPELINE",
+          "links": [
+            81
           ]
         },
         {
           "name": "albedo",
           "type": "IMAGE",
           "links": [
-            6,
-            10
+            78
           ]
         },
         {
           "name": "mr",
           "type": "IMAGE",
           "links": [
-            7
+            79
           ]
         },
         {
@@ -884,285 +719,208 @@
         }
       ],
       "properties": {
-        "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
-        "ver": "dc84deb90a0c652be956e82799ebe60fc79590dc",
+        "aux_id": "PozzettiAndrea/ComfyUI-HunyuanX",
+        "ver": "a00fb88034a72c59a6345b1487a246ce85ebbc0b",
         "Node name for S&R": "HunyuanX_MultiViewsGenerator"
       },
       "widgets_values": [
         512,
-        6,
+        10,
         3,
-        512,
-        false,
-        42,
-        "fixed",
+        1024,
+        true,
+        966813960337595,
+        "randomize",
         true
       ]
-    },
-    {
-      "id": 45,
-      "type": "HunyuanX_MeshUVWrap",
-      "pos": [
-        724.8544302488747,
-        717.2710855115519
-      ],
-      "size": [
-        239.6255859375,
-        26
-      ],
-      "flags": {},
-      "order": 12,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "trimesh",
-          "type": "TRIMESH",
-          "link": 56
-        }
-      ],
-      "outputs": [
-        {
-          "name": "trimesh",
-          "type": "TRIMESH",
-          "links": [
-            1
-          ]
-        }
-      ],
-      "properties": {
-        "aux_id": "PozzettiAndrea/ComfyUI-MeshCraft",
-        "ver": "dc84deb90a0c652be956e82799ebe60fc79590dc",
-        "Node name for S&R": "HunyuanX_MeshUVWrap"
-      },
-      "widgets_values": []
     }
   ],
   "links": [
     [
+      63,
+      240,
+      0,
+      270,
       1,
-      45,
-      0,
-      20,
-      0,
-      "TRIMESH"
-    ],
-    [
-      2,
-      19,
-      0,
-      20,
-      1,
-      "HY3D21CAMERA"
-    ],
-    [
-      4,
-      20,
-      0,
-      21,
-      0,
-      "HY3DPIPELINE"
-    ],
-    [
-      5,
-      19,
-      0,
-      21,
-      1,
-      "HY3D21CAMERA"
-    ],
-    [
-      6,
-      20,
-      1,
-      21,
-      2,
       "IMAGE"
     ],
     [
-      7,
-      20,
-      2,
-      21,
-      3,
-      "IMAGE"
-    ],
-    [
-      10,
-      20,
-      1,
-      46,
+      64,
+      271,
       0,
-      "IMAGE"
-    ],
-    [
-      12,
-      21,
-      0,
-      49,
-      0,
-      "HY3DPIPELINE"
-    ],
-    [
-      13,
-      21,
-      1,
-      49,
-      1,
-      "NPARRAY"
-    ],
-    [
-      14,
-      21,
-      2,
-      49,
-      2,
-      "NPARRAY"
-    ],
-    [
-      15,
-      21,
-      3,
-      49,
-      3,
-      "NPARRAY"
-    ],
-    [
-      16,
-      21,
-      4,
-      49,
-      4,
-      "NPARRAY"
-    ],
-    [
-      17,
-      49,
-      0,
-      50,
-      0,
-      "IMAGE"
-    ],
-    [
-      18,
-      49,
-      1,
-      51,
-      0,
-      "IMAGE"
-    ],
-    [
-      19,
-      49,
-      3,
-      104,
-      1,
-      "STRING"
-    ],
-    [
-      21,
-      258,
-      0,
-      113,
-      0,
-      "TRIMESH"
-    ],
-    [
-      22,
-      113,
-      0,
-      119,
-      1,
-      "STRING"
-    ],
-    [
-      34,
-      251,
-      0,
-      252,
+      270,
       0,
       "DINO_MODEL"
     ],
     [
-      35,
-      252,
+      65,
+      273,
       0,
-      254,
-      1,
-      "DINO_EMBEDDING"
-    ],
-    [
-      36,
-      255,
-      0,
-      254,
+      272,
       0,
       "HY3D_DIT_MODEL"
     ],
     [
-      37,
-      254,
+      66,
+      270,
       0,
-      258,
+      272,
+      1,
+      "DINO_EMBEDDING"
+    ],
+    [
+      67,
+      272,
+      0,
+      275,
       1,
       "HY3DLATENT"
     ],
     [
-      38,
-      259,
+      68,
+      274,
       0,
-      258,
+      275,
       0,
       "HY3DVAE"
     ],
     [
-      52,
-      240,
+      69,
+      275,
       0,
-      252,
-      1,
-      "IMAGE"
+      276,
+      0,
+      "TRIMESH"
     ],
     [
-      53,
-      240,
+      70,
+      276,
       0,
-      20,
+      277,
+      1,
+      "STRING"
+    ],
+    [
+      74,
+      275,
+      0,
+      278,
+      0,
+      "TRIMESH"
+    ],
+    [
+      75,
+      279,
+      0,
+      278,
+      1,
+      "HY3D21CAMERA"
+    ],
+    [
+      76,
+      275,
+      0,
+      280,
+      0,
+      "TRIMESH"
+    ],
+    [
+      78,
+      278,
+      1,
+      281,
       2,
       "IMAGE"
     ],
     [
-      56,
-      264,
-      0,
-      45,
-      0,
-      "TRIMESH"
+      79,
+      278,
+      2,
+      281,
+      3,
+      "IMAGE"
     ],
     [
-      57,
-      258,
+      80,
+      279,
       0,
-      265,
-      0,
-      "TRIMESH"
+      281,
+      1,
+      "HY3D21CAMERA"
     ],
     [
-      58,
-      265,
+      81,
+      278,
       0,
-      264,
+      281,
       0,
-      "TRIMESH"
+      "HY3DPIPELINE"
+    ],
+    [
+      87,
+      281,
+      3,
+      283,
+      3,
+      "NPARRAY"
+    ],
+    [
+      88,
+      281,
+      0,
+      283,
+      0,
+      "HY3DPIPELINE"
+    ],
+    [
+      89,
+      283,
+      3,
+      285,
+      1,
+      "STRING"
+    ],
+    [
+      91,
+      281,
+      2,
+      283,
+      2,
+      "NPARRAY"
+    ],
+    [
+      92,
+      281,
+      1,
+      283,
+      1,
+      "NPARRAY"
+    ],
+    [
+      93,
+      281,
+      4,
+      283,
+      4,
+      "NPARRAY"
+    ],
+    [
+      94,
+      240,
+      0,
+      278,
+      2,
+      "IMAGE"
     ]
   ],
   "groups": [],
   "config": {},
   "extra": {
     "ds": {
-      "scale": 1.1950667706887337,
+      "scale": 1.0864243369897664,
       "offset": [
-        -364.7468182557867,
-        -433.5323168618495
+        -78.62079068306332,
+        -394.0922985299808
       ]
     },
     "frontendVersion": "1.28.8"
