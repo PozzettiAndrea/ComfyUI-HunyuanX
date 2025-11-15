@@ -414,6 +414,11 @@ def patch_custom_rasterizer_setup():
         with open(setup_path, 'r') as f:
             content = f.read()
 
+        # Check if already patched with auto-detection logic
+        if 'get_pytorch_abi' in content:
+            print("[ComfyUI-HunyuanX] custom_rasterizer setup.py already patched with ABI auto-detection")
+            return True
+
         # Check if already patched with the correct flags (must have -ccbin)
         if 'extra_compile_args' in content and '-ccbin' in content:
             print("[ComfyUI-HunyuanX] custom_rasterizer setup.py already patched")
@@ -557,6 +562,27 @@ def compile_cuda_extensions():
         print(f"[ComfyUI-HunyuanX] Set CUDA_HOME={cuda_home}")
 
     print(f"[ComfyUI-HunyuanX] ✅ CUDA toolkit found (CUDA_HOME={os.environ.get('CUDA_HOME', 'not set')})")
+
+    # Install ninja for faster CUDA compilation
+    print("[ComfyUI-HunyuanX] Checking for ninja build system...")
+    try:
+        import ninja
+        print("[ComfyUI-HunyuanX] ✅ Ninja already installed")
+    except ImportError:
+        print("[ComfyUI-HunyuanX] Installing ninja for faster compilation...")
+        try:
+            result = subprocess.run(
+                [sys.executable, "-m", "pip", "install", "ninja"],
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            if result.returncode == 0:
+                print("[ComfyUI-HunyuanX] ✅ Ninja installed successfully")
+            else:
+                print("[ComfyUI-HunyuanX] ⚠️  Ninja installation failed (will use slower distutils)")
+        except Exception as e:
+            print(f"[ComfyUI-HunyuanX] ⚠️  Could not install ninja: {e}")
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
