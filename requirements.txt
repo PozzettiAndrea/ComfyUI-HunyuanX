@@ -18,6 +18,7 @@ accelerate  # Model loading optimization
 timm  # Vision models
 einops>=0.7.0  # Tensor operations
 pytorch_lightning  # Training framework for hy3dshape/hy3dpaint
+pybind11  # C++ bindings for CUDA extensions
 
 # Configuration (REQUIRED)
 omegaconf  # Config loading
