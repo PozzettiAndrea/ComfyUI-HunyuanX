@@ -55,12 +55,35 @@ def setup_torch_library_path():
 
 
 def check_cuda_extension():
-    """Check if custom_rasterizer CUDA extension is compiled (fast check only)"""
+    """Check if custom_rasterizer CUDA extension is compiled (handles both regular and editable installs)"""
+    # Strategy 1: Try direct import (most reliable - works for all install types)
+    try:
+        import custom_rasterizer
+        return True
+    except ImportError:
+        pass
+
+    # Strategy 2: Check site-packages for regular install
     site_packages = site.getsitepackages()[0] if site.getsitepackages() else None
     if site_packages:
+        # Check for regular install directory
         pkg_dir = os.path.join(site_packages, "custom_rasterizer")
         if os.path.exists(pkg_dir):
             return True
+
+        # Check for editable install marker (.egg-link)
+        egg_link = os.path.join(site_packages, "custom_rasterizer.egg-link")
+        if os.path.exists(egg_link):
+            try:
+                # Verify the source directory has compiled .so files
+                with open(egg_link, 'r') as f:
+                    source_dir = f.readline().strip()
+                so_files = glob.glob(os.path.join(source_dir, "**", "*.so"), recursive=True)
+                if so_files:
+                    return True
+            except Exception:
+                pass
+
     return False
 
 

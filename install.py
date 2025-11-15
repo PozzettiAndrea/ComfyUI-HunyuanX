@@ -592,7 +592,7 @@ def compile_cuda_extensions():
                     print(f"[ComfyUI-HunyuanX] Set CUDA_INC_PATH={cuda_inc_path}")
 
             result = subprocess.run(
-                [sys.executable, "-m", "pip", "install", "-e", ".", "--no-build-isolation"],
+                [sys.executable, "-m", "pip", "install", ".", "--no-build-isolation"],
                 cwd=rasterizer_dir,
                 capture_output=True,
                 text=True,
