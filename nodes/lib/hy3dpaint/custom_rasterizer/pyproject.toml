@@ -1,0 +1,10 @@
+[build-system]
+requires = ["setuptools", "wheel", "torch"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "custom_rasterizer"
+version = "0.1"
+description = "Custom CUDA rasterizer for texture generation"
+requires-python = ">=3.7"
+dependencies = []

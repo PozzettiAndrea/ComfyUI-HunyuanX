@@ -25,6 +25,10 @@ custom_rasterizer_module = CUDAExtension(
         "lib/custom_rasterizer_kernel/grid_neighbor.cpp",
         "lib/custom_rasterizer_kernel/rasterizer_gpu.cu",
     ],
+    extra_compile_args={
+        'cxx': ['-D_GLIBCXX_USE_CXX11_ABI=0'],
+        'nvcc': ['-D_GLIBCXX_USE_CXX11_ABI=0', '-ccbin', '/usr/bin/g++']
+    }
 )
 
 setup(

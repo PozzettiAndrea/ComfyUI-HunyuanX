@@ -4,7 +4,10 @@ __pycache__/
 *.so
 *.o
 *.egg-info/
+*.egg
 build/
+dist/
+*.whl
 *.ipynb_checkpoints/
 
 # Ignore all models directories (except source code)
