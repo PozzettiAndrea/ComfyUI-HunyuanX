@@ -524,6 +524,259 @@ def patch_custom_rasterizer_setup():
         return False
 
 
+def get_platform_info():
+    """Detect current platform and architecture."""
+    import platform
+    system = platform.system().lower()
+    machine = platform.machine().lower()
+
+    # Map platform names
+    if system == "darwin":
+        plat = "macos"
+        if machine == "arm64":
+            arch = "arm64"
+        else:
+            arch = "x64"
+    elif system == "linux":
+        plat = "linux"
+        arch = "x64"  # Most common
+    elif system == "windows":
+        plat = "windows"
+        arch = "x64"
+    else:
+        plat = None
+        arch = None
+
+    return plat, arch
+
+
+def get_blender_download_url(platform_name, architecture):
+    """
+    Get Blender 4.2 LTS download URL for the platform.
+
+    Args:
+        platform_name: "linux", "macos", or "windows"
+        architecture: "x64" or "arm64"
+
+    Returns:
+        tuple: (download_url, version, filename) or (None, None, None) if not found
+    """
+    version = "4.2.3"
+    base_url = "https://download.blender.org/release/Blender4.2"
+
+    # Platform-specific URLs for Blender 4.2.3 LTS
+    urls = {
+        ("linux", "x64"): (
+            f"{base_url}/blender-{version}-linux-x64.tar.xz",
+            version,
+            f"blender-{version}-linux-x64.tar.xz"
+        ),
+        ("macos", "x64"): (
+            f"{base_url}/blender-{version}-macos-x64.dmg",
+            version,
+            f"blender-{version}-macos-x64.dmg"
+        ),
+        ("macos", "arm64"): (
+            f"{base_url}/blender-{version}-macos-arm64.dmg",
+            version,
+            f"blender-{version}-macos-arm64.dmg"
+        ),
+        ("windows", "x64"): (
+            f"{base_url}/blender-{version}-windows-x64.zip",
+            version,
+            f"blender-{version}-windows-x64.zip"
+        ),
+    }
+
+    key = (platform_name, architecture)
+    if key in urls:
+        url, ver, filename = urls[key]
+        print(f"[ComfyUI-HunyuanX] Using Blender {ver} for {platform_name}-{architecture}")
+        return url, ver, filename
+
+    return None, None, None
+
+
+def download_file(url, dest_path):
+    """Download file with progress."""
+    print(f"[ComfyUI-HunyuanX] Downloading: {url}")
+    print(f"[ComfyUI-HunyuanX] Destination: {dest_path}")
+
+    try:
+        import urllib.request
+
+        def progress_hook(count, block_size, total_size):
+            if total_size > 0:
+                percent = int(count * block_size * 100 / total_size)
+                sys.stdout.write(f"\r[ComfyUI-HunyuanX] Progress: {percent}%")
+                sys.stdout.flush()
+
+        urllib.request.urlretrieve(url, dest_path, progress_hook)
+        sys.stdout.write("\n")
+        print("[ComfyUI-HunyuanX] Download complete!")
+        return True
+    except Exception as e:
+        print(f"\n[ComfyUI-HunyuanX] Error downloading: {e}")
+        return False
+
+
+def extract_archive(archive_path, extract_to):
+    """Extract tar.gz, tar.xz, or zip archive."""
+    import tarfile
+    import zipfile
+    import shutil
+    from pathlib import Path
+
+    print(f"[ComfyUI-HunyuanX] Extracting: {archive_path}")
+
+    try:
+        if archive_path.endswith('.tar.xz') or archive_path.endswith(('.tar.gz', '.tar.bz2')):
+            # Extract tar archives
+            with tarfile.open(archive_path, 'r:*') as tar:
+                # Use filter for Python 3.14+ compatibility
+                if hasattr(tarfile, 'data_filter'):
+                    tar.extractall(extract_to, filter='data')
+                else:
+                    tar.extractall(extract_to)
+        elif archive_path.endswith('.zip'):
+            # Extract zip archives
+            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_to)
+        elif archive_path.endswith('.dmg'):
+            # macOS DMG - mount and copy Blender.app
+            print("[ComfyUI-HunyuanX] DMG detected - mounting disk image...")
+
+            # Mount the DMG
+            mount_result = subprocess.run(
+                ['hdiutil', 'attach', '-nobrowse', archive_path],
+                capture_output=True,
+                text=True
+            )
+
+            if mount_result.returncode != 0:
+                print(f"[ComfyUI-HunyuanX] Error mounting DMG: {mount_result.stderr}")
+                return False
+
+            # Find the mount point from the output
+            mount_point = None
+            for line in mount_result.stdout.split('\n'):
+                if '/Volumes/' in line:
+                    mount_point = line.split('\t')[-1].strip()
+                    break
+
+            if not mount_point:
+                print("[ComfyUI-HunyuanX] Error: Could not find mount point")
+                return False
+
+            try:
+                # Copy Blender.app to destination
+                blender_app = Path(mount_point) / "Blender.app"
+                if blender_app.exists():
+                    dest_app = Path(extract_to) / "Blender.app"
+                    shutil.copytree(blender_app, dest_app)
+                    print(f"[ComfyUI-HunyuanX] Copied Blender.app to: {dest_app}")
+                else:
+                    print(f"[ComfyUI-HunyuanX] Error: Blender.app not found in {mount_point}")
+                    return False
+
+            finally:
+                # Unmount the DMG
+                subprocess.run(['hdiutil', 'detach', mount_point], check=False)
+        else:
+            print(f"[ComfyUI-HunyuanX] Error: Unknown archive format: {archive_path}")
+            return False
+
+        print(f"[ComfyUI-HunyuanX] Extraction complete!")
+        return True
+
+    except Exception as e:
+        print(f"[ComfyUI-HunyuanX] Error extracting: {e}")
+        return False
+
+
+def install_blender():
+    """Download and install Blender for UV unwrapping."""
+    from pathlib import Path
+    import shutil
+
+    print("\n[ComfyUI-HunyuanX] Installing Blender for UV unwrapping...")
+    print("[ComfyUI-HunyuanX] This is required for texture generation\n")
+
+    # Get script directory
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    blender_dir = os.path.join(script_dir, "_blender")
+
+    # Check if Blender already installed
+    if os.path.exists(blender_dir):
+        print("[ComfyUI-HunyuanX] Blender directory already exists at:")
+        print(f"[ComfyUI-HunyuanX]   {blender_dir}")
+        print("[ComfyUI-HunyuanX] Skipping download. Delete '_blender/' folder to reinstall.")
+        return True
+
+    # Detect platform
+    plat, arch = get_platform_info()
+    if not plat or not arch:
+        print("[ComfyUI-HunyuanX] ⚠️  Could not detect platform")
+        print("[ComfyUI-HunyuanX] Please install Blender manually from: https://www.blender.org/download/")
+        print("[ComfyUI-HunyuanX] Texture generation will not work without Blender")
+        return False
+
+    print(f"[ComfyUI-HunyuanX] Detected platform: {plat}-{arch}")
+
+    # Get download URL
+    url, version, filename = get_blender_download_url(plat, arch)
+    if not url:
+        print("[ComfyUI-HunyuanX] ⚠️  Could not find Blender download for your platform")
+        print("[ComfyUI-HunyuanX] Please install Blender manually from: https://www.blender.org/download/")
+        print("[ComfyUI-HunyuanX] Texture generation will not work without Blender")
+        return False
+
+    # Create temporary download directory
+    temp_dir = os.path.join(script_dir, "_temp_download")
+    os.makedirs(temp_dir, exist_ok=True)
+
+    try:
+        # Download
+        download_path = os.path.join(temp_dir, filename)
+        if not download_file(url, download_path):
+            return False
+
+        # Extract
+        os.makedirs(blender_dir, exist_ok=True)
+        if not extract_archive(download_path, blender_dir):
+            return False
+
+        print("\n[ComfyUI-HunyuanX] ✅ Blender installation complete!")
+        print(f"[ComfyUI-HunyuanX] Location: {blender_dir}")
+
+        # Find blender executable
+        import shutil as sh_util
+        from pathlib import Path
+        blender_dir_path = Path(blender_dir)
+
+        if plat == "windows":
+            blender_exe = list(blender_dir_path.rglob("blender.exe"))
+        else:
+            blender_exe = [p for p in blender_dir_path.rglob("blender") if p.is_file() and os.access(p, os.X_OK)]
+
+        if blender_exe:
+            print(f"[ComfyUI-HunyuanX] Blender executable: {blender_exe[0]}")
+
+        return True
+
+    except Exception as e:
+        print(f"\n[ComfyUI-HunyuanX] ⚠️  Error during Blender installation: {e}")
+        print("[ComfyUI-HunyuanX] Texture generation will not work without Blender")
+        return False
+
+    finally:
+        # Cleanup temp files
+        if os.path.exists(temp_dir):
+            print("[ComfyUI-HunyuanX] Cleaning up temporary files...")
+            import shutil
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+
 def compile_cuda_extensions():
     """
     Compile Hunyuan-specific CUDA extensions:
@@ -678,7 +931,11 @@ if __name__ == "__main__":
     print("\n")
     flash_ok = try_install_flash_attn()
 
-    # 3. Compile CUDA extensions
+    # 3. Install Blender for UV unwrapping
+    print("\n")
+    blender_ok = install_blender()
+
+    # 4. Compile CUDA extensions
     print("\n")
     compile_cuda_extensions()
 
@@ -690,6 +947,7 @@ if __name__ == "__main__":
     status_emoji = {True: "✅", False: "⚠️"}
     print(f"{status_emoji[requirements_ok]} Python dependencies (requirements.txt)")
     print(f"{status_emoji[flash_ok]} flash-attn (optional, 10-20% faster inference)")
+    print(f"{status_emoji[blender_ok]} Blender 4.2.3 LTS (required for texture generation)")
     print("✅ CUDA extensions (check messages above for status)")
 
     if requirements_ok:
