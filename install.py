@@ -582,6 +582,15 @@ def compile_cuda_extensions():
                 env['CC'] = system_gcc
                 print(f"[ComfyUI-HunyuanX] Using system compilers for C/C++ files")
 
+            # Set CUDA include path for conda-installed CUDA toolkit
+            # Conda places headers in targets/x86_64-linux/include instead of include/
+            cuda_home = os.environ.get('CUDA_HOME')
+            if cuda_home:
+                cuda_inc_path = os.path.join(cuda_home, 'targets', 'x86_64-linux', 'include')
+                if os.path.exists(cuda_inc_path):
+                    env['CUDA_INC_PATH'] = cuda_inc_path
+                    print(f"[ComfyUI-HunyuanX] Set CUDA_INC_PATH={cuda_inc_path}")
+
             result = subprocess.run(
                 [sys.executable, "-m", "pip", "install", "-e", ".", "--no-build-isolation"],
                 cwd=rasterizer_dir,
